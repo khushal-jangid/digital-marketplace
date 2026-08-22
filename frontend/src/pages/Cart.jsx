@@ -56,17 +56,30 @@ const Cart = () => {
     }
   }, [user, showQrModal]);
 
+  // Autofill copied promo code from Flash Sale banner
+  useEffect(() => {
+    try {
+      const savedPromo = localStorage.getItem('copied_promo');
+      if (savedPromo && !coupon) {
+        setCouponCode(savedPromo);
+      }
+    } catch (_) {}
+  }, [coupon]);
+
   const handleApplyCouponSubmit = async (e) => {
     e.preventDefault();
     setCouponMsg('');
     setCouponError('');
-    if (!couponCode) return;
+    if (!couponCode || !couponCode.trim()) return;
 
     try {
-      const data = await applyCoupon(couponCode);
-      if (data.success) {
-        setCouponMsg(data.message);
+      const data = await applyCoupon(couponCode.trim());
+      if (data && data.success) {
+        setCouponMsg(data.message || 'Coupon applied successfully!');
         setCouponCode('');
+        try {
+          localStorage.removeItem('copied_promo');
+        } catch (_) {}
       }
     } catch (err) {
       setCouponError(err.message || 'Invalid coupon code');
@@ -272,41 +285,59 @@ const Cart = () => {
             </div>
 
             {/* Promo coupon input */}
-            <form onSubmit={handleApplyCouponSubmit} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              <input
-                type="text"
-                placeholder="Enter Promo Code..."
-                className="form-input"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
-                style={{ padding: '8px 12px', fontSize: '13px' }}
-              />
-              <button type="submit" className="btn btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }}>
-                Apply
-              </button>
-            </form>
+            {coupon ? (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.12)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '16px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12.5px', color: '#10b981', fontWeight: 700 }}>
+                    ✓ Code Applied: <strong style={{ fontFamily: 'monospace' }}>{coupon.code}</strong>
+                  </span>
+                  <span style={{ fontSize: '11px', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                    {coupon.discountValue}% OFF
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={removeCoupon}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#f87171',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    padding: '2px 6px'
+                  }}
+                >
+                  ✕ Remove
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleApplyCouponSubmit} style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+                <input
+                  type="text"
+                  placeholder="Paste Promo / Flash Code..."
+                  className="form-input"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  style={{ padding: '9px 12px', fontSize: '13px', textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 600 }}
+                />
+                <button type="submit" className="btn btn-primary" style={{ padding: '9px 18px', fontSize: '13px', fontWeight: 700 }}>
+                  Apply
+                </button>
+              </form>
+            )}
 
             {couponMsg && <div style={{ color: 'var(--success)', fontSize: '12px', marginBottom: '14px', fontWeight: 600 }}>{couponMsg}</div>}
             {couponError && <div style={{ color: 'var(--error)', fontSize: '12px', marginBottom: '14px', fontWeight: 600 }}>{couponError}</div>}
-            
-            {coupon && (
-              <button
-                onClick={removeCoupon}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  marginBottom: '20px'
-                }}
-              >
-                Remove applied coupon
-              </button>
-            )}
 
             {/* Payment Method Info */}
             <div style={{

@@ -71,8 +71,11 @@ const FlashSaleBanner = () => {
   const handleCopy = (e) => {
     e.preventDefault();
     navigator.clipboard.writeText(promoCode);
+    try {
+      localStorage.setItem('copied_promo', promoCode);
+    } catch (_) {}
     setCopied(true);
-    setTimeout(() => setCopied(false), 2200);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   return (
@@ -135,7 +138,7 @@ const FlashSaleBanner = () => {
               <span>{title}</span>
             </h4>
             <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
-              {saleData.subtitle || 'Use coupon code at checkout for instant discount across the entire catalog.'}
+              {saleData.subtitle || 'Copy code below and paste at checkout for instant discount!'}
             </p>
           </div>
         </div>
@@ -214,14 +217,13 @@ const FlashSaleBanner = () => {
           <button
             onClick={handleCopy}
             style={{
-              background: 'var(--bg-primary)',
-              border: '1px dashed #f43f5e',
-              color: 'var(--text-primary)',
-              padding: '6px 12px',
+              background: copied ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-primary)',
+              border: `1.5px dashed ${copied ? '#10b981' : '#f43f5e'}`,
+              color: copied ? '#10b981' : 'var(--text-primary)',
+              padding: '8px 14px',
               borderRadius: '8px',
-              fontSize: '12.5px',
+              fontSize: '13px',
               fontWeight: 700,
-              fontFamily: 'monospace',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -230,8 +232,17 @@ const FlashSaleBanner = () => {
             }}
             title="Click to copy coupon code"
           >
-            <span style={{ color: '#f43f5e' }}>{promoCode}</span>
-            {copied ? <Check size={13} style={{ color: '#10b981' }} /> : <Copy size={13} style={{ color: 'var(--text-muted)' }} />}
+            {copied ? (
+              <>
+                <Check size={14} style={{ color: '#10b981' }} />
+                <span>✓ Copied: {promoCode}</span>
+              </>
+            ) : (
+              <>
+                <Copy size={14} style={{ color: '#f43f5e' }} />
+                <span>Copy Code: <strong style={{ color: '#f43f5e', fontFamily: 'monospace' }}>{promoCode}</strong></span>
+              </>
+            )}
           </button>
 
           <Link
