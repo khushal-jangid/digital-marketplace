@@ -374,35 +374,59 @@ export const sendDirectEmail = async (req, res) => {
 
     // Try sending via nodemailer if SMTP is provided in .env
     const nodemailer = (await import('nodemailer')).default;
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-      const transporter = nodemailer.createTransport({
-        service: process.env.SMTP_HOST?.includes('gmail') ? 'gmail' : undefined,
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: Number(process.env.SMTP_PORT) || 465,
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
+    const activeUser = process.env.SMTP_USER || process.env.EMAIL_USER || 'khushaljangra721@gmail.com';
+    const activePass = (process.env.SMTP_PASS || process.env.EMAIL_PASS || 'vhlb tlrl iulw lqdi').replace(/\s+/g, '');
 
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: activeUser,
+        pass: activePass,
+      },
+    });
+
+    // 1. Email to Admin
+    await transporter.sendMail({
+      from: `"${senderName}" <${activeUser}>`,
+      replyTo: senderEmail,
+      to: targetOwnerEmail,
+      subject: `[ApexMarket Support] ${subject} (${senderName})`,
+      text: `From: ${senderName} (${senderEmail})\n\nMessage:\n${message}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+          <h2 style="color: #4f46e5; margin-top: 0;">New Support Message from Website</h2>
+          <div style="background: #f8fafc; padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+            <p style="margin: 0 0 6px 0;"><strong>Sender:</strong> ${senderName} &lt;${senderEmail}&gt;</p>
+            <p style="margin: 0;"><strong>Subject:</strong> ${subject}</p>
+          </div>
+          <p><strong>Message:</strong></p>
+          <div style="background: #fdfdfd; padding: 14px; border-radius: 8px; border: 1px dashed #cbd5e1; white-space: pre-wrap;">${message}</div>
+        </div>
+      `,
+    });
+
+    // 2. Acknowledgment to Customer
+    if (senderEmail && senderEmail.includes('@')) {
       await transporter.sendMail({
-        from: `"${senderName}" <${process.env.SMTP_USER}>`,
-        replyTo: senderEmail,
-        to: targetOwnerEmail,
-        subject: `[ApexMarket Support] ${subject}`,
-        text: `From: ${senderName} (${senderEmail})\n\nMessage:\n${message}`,
+        from: `"ApexMarket Support" <${activeUser}>`,
+        to: senderEmail,
+        subject: `Support Request Received: ${subject}`,
         html: `
-          <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
-            <h2 style="color: #4f46e5;">New Support Message from Website</h2>
-            <p><strong>Sender:</strong> ${senderName} &lt;${senderEmail}&gt;</p>
-            <p><strong>Subject:</strong> ${subject}</p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 16px 0;" />
-            <p><strong>Message:</strong></p>
-            <div style="background: #f8fafc; padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0; white-space: pre-wrap;">${message}</div>
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+            <h2 style="color: #10b981; margin-top: 0;">We've Received Your Support Request!</h2>
+            <p>Hello ${senderName || 'Developer'},</p>
+            <p>Thank you for reaching out to ApexMarket Support. We have received your inquiry regarding <strong>"${subject}"</strong> and our technical team is reviewing it.</p>
+            <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+              <p style="margin: 0; color: #166534; font-size: 13px;">We typically respond within a few hours. You can reply directly to this email if you have any additional details.</p>
+            </div>
+            <p style="color: #64748b; font-size: 12px; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+              ApexMarket Help Desk • khushaljangra721@gmail.com
+            </p>
           </div>
         `,
-      });
+      }).catch(() => {});
     }
 
     console.log(`\n========================================\n[EMAIL DISPATCHED TO: ${targetOwnerEmail}]\nFROM: ${senderName} (${senderEmail})\nSUBJECT: ${subject}\nMESSAGE: ${message}\n========================================\n`);
