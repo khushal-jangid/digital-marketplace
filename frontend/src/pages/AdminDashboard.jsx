@@ -166,15 +166,6 @@ const AdminDashboard = () => {
       const data = await request('/flash-sale', 'PUT', updated);
       if (data.success) {
         await fetchCoupons();
-        setCouponNotification({
-          type: 'flashSale',
-          code: updated.promoCode,
-          title: nextState ? '⚡ Flash Sale is Now LIVE & Activated!' : '🛑 Flash Sale Deactivated (Hidden from Store)',
-          details: nextState
-            ? `Flash Sale banner is now visible with promo code ${updated.promoCode} (${updated.discountPercentage}% OFF).`
-            : 'Flash Sale banner has been hidden from the store and checkout coupon deactivated.',
-        });
-        setTimeout(() => setCouponNotification(null), 6000);
       }
     } catch (err) {
       console.error('Failed to toggle flash sale:', err.message);
@@ -191,27 +182,12 @@ const AdminDashboard = () => {
       if (data.success) {
         setFlashSaleMsg(data.message || 'Flash Sale settings updated and synced with promo coupons!');
         await fetchCoupons();
-
-        setCouponNotification({
-          type: 'flashSale',
-          code: flashSaleConfig.promoCode,
-          title: `⚡ Flash Sale ${flashSaleConfig.isActive ? 'is LIVE & Activated!' : 'Settings Saved (Paused)'}`,
-          details: `${flashSaleConfig.title || 'Catalog Flash Deal'} • Coupon: ${flashSaleConfig.promoCode} (${flashSaleConfig.discountPercentage}% OFF) • Target: ${flashSaleConfig.targetProjectTitle || 'All Projects'} • Ends: ${new Date(flashSaleConfig.endTime).toLocaleString()}`,
-        });
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-
         setTimeout(() => {
           setFlashSaleMsg('');
-          setCouponNotification(null);
-        }, 8000);
+        }, 4000);
       }
     } catch (err) {
       setFlashSaleError(err.message || 'Failed to update flash sale');
-      setCouponNotification({
-        type: 'error',
-        title: '❌ Flash Sale Update Failed',
-        details: err.message || 'Could not save flash sale configuration.',
-      });
     } finally {
       setFlashSaleLoading(false);
     }
@@ -234,15 +210,9 @@ const AdminDashboard = () => {
           targetProjectTitle: 'All Projects',
         });
         await fetchCoupons();
-        setCouponNotification({
-          type: 'flashSale',
-          title: '🗑️ Flash Sale Deleted Permanently',
-          details: 'Flash Sale and its promotional banner have been completely removed from the store.',
-        });
-        setTimeout(() => setCouponNotification(null), 6000);
       }
     } catch (err) {
-      alert(err.message || 'Failed to delete flash sale');
+      setFlashSaleError(err.message || 'Failed to delete flash sale');
     } finally {
       setFlashSaleLoading(false);
     }
