@@ -513,6 +513,35 @@ app.delete('/api/projects/:id', authenticate, requireAdmin, async (req, res) => 
   }
 });
 
+app.get('/api/projects/download-secure', async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) {
+      return res.redirect('https://codewithkj.vercel.app/dashboard');
+    }
+
+    let decoded = null;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (_) {
+      try {
+        decoded = jwt.decode(token);
+      } catch (_) {}
+    }
+
+    if (decoded && decoded.projectId) {
+      const project = await Project.findById(decoded.projectId);
+      if (project && (project.externalDownloadUrl || project.fileUrl)) {
+        return res.redirect(302, project.externalDownloadUrl || project.fileUrl);
+      }
+    }
+
+    return res.redirect('https://codewithkj.vercel.app/dashboard');
+  } catch (_) {
+    return res.redirect('https://codewithkj.vercel.app/dashboard');
+  }
+});
+
 // ==========================================
 // 4. ORDERS & VERIFICATION DESK
 // ==========================================
@@ -695,7 +724,19 @@ app.put('/api/orders/:id/status', authenticate, requireAdmin, async (req, res) =
     const { paymentStatus } = req.body;
     const order = await Order.findByIdAndUpdate(req.params.id, { paymentStatus }, { new: true }).populate('projects');
     if (paymentStatus === 'paid' && order?.userEmail) {
-      const itemsListHtml = (order.projects || []).map((p) => `<li><strong>${p.title}</strong> - ₹${p.price}</li>`).join('');
+      const itemsListHtml = (order.projects || []).map((p) => {
+        const directUrl = p.externalDownloadUrl || p.fileUrl || 'https://codewithkj.vercel.app/dashboard';
+        return `
+          <div style="margin: 12px 0; padding: 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px;">
+            <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: bold; color: #1e293b;">📦 ${p.title} (₹${p.price})</p>
+            <a href="${directUrl}" target="_blank" style="background: #10b981; color: #ffffff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: bold; display: inline-block; margin-top: 4px;">
+              ⬇️ Download Project Source Code
+            </a>
+            ${p.externalDownloadUrl ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #64748b; word-break: break-all;">Direct Link: <a href="${p.externalDownloadUrl}" target="_blank">${p.externalDownloadUrl}</a></p>` : ''}
+          </div>
+        `;
+      }).join('');
+
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
           <h2 style="color: #10b981; margin-top: 0;">🎉 Payment Approved & Order Confirmed!</h2>
@@ -706,12 +747,14 @@ app.put('/api/orders/:id/status', authenticate, requireAdmin, async (req, res) =
             <p style="margin: 0 0 8px 0;"><strong>Invoice ID:</strong> ${order.invoiceNumber || order._id}</p>
             <p style="margin: 0 0 8px 0;"><strong>Amount Paid:</strong> ₹${order.totalAmount}</p>
             <p style="margin: 0;"><strong>Payment Method:</strong> ${order.paymentMethod || 'UPI Direct Transfer'}</p>
-            ${itemsListHtml ? `<ul style="margin: 12px 0 0 0; padding-left: 20px;">${itemsListHtml}</ul>` : ''}
           </div>
 
-          <p style="margin: 20px 0;">
+          <h3 style="color: #1e293b; margin: 20px 0 10px 0;">Your Downloads:</h3>
+          ${itemsListHtml || '<p>Access all your projects directly in your dashboard.</p>'}
+
+          <p style="margin: 24px 0; text-align: center;">
             <a href="https://codewithkj.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
-              Go to Dashboard & Download Projects
+              Open Dashboard (My Purchases)
             </a>
           </p>
 
@@ -739,7 +782,19 @@ app.post('/api/orders/verify-utr/:id', authenticate, requireAdmin, async (req, r
 
     const targetEmail = order.userEmail || order.contactEmail;
     if (targetEmail) {
-      const itemsListHtml = (order.projects || []).map((p) => `<li><strong>${p.title}</strong> - ₹${p.price}</li>`).join('');
+      const itemsListHtml = (order.projects || []).map((p) => {
+        const directUrl = p.externalDownloadUrl || p.fileUrl || 'https://codewithkj.vercel.app/dashboard';
+        return `
+          <div style="margin: 12px 0; padding: 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px;">
+            <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: bold; color: #1e293b;">📦 ${p.title} (₹${p.price})</p>
+            <a href="${directUrl}" target="_blank" style="background: #10b981; color: #ffffff; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: bold; display: inline-block; margin-top: 4px;">
+              ⬇️ Download Project Source Code
+            </a>
+            ${p.externalDownloadUrl ? `<p style="margin: 6px 0 0 0; font-size: 11px; color: #64748b; word-break: break-all;">Direct Link: <a href="${p.externalDownloadUrl}" target="_blank">${p.externalDownloadUrl}</a></p>` : ''}
+          </div>
+        `;
+      }).join('');
+
       const html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
           <h2 style="color: #10b981; margin-top: 0;">🎉 Payment Approved & Download Unlocked!</h2>
@@ -751,12 +806,14 @@ app.post('/api/orders/verify-utr/:id', authenticate, requireAdmin, async (req, r
             <p style="margin: 0 0 8px 0;"><strong>Amount Paid:</strong> ₹${order.totalAmount}</p>
             <p style="margin: 0 0 8px 0;"><strong>UTR / Reference:</strong> ${order.utrNumber || 'Verified'}</p>
             <p style="margin: 0;"><strong>Status:</strong> <span style="color: #10b981; font-weight: bold;">PAID (Access Unlocked)</span></p>
-            ${itemsListHtml ? `<ul style="margin: 12px 0 0 0; padding-left: 20px;">${itemsListHtml}</ul>` : ''}
           </div>
 
-          <p style="margin: 20px 0;">
+          <h3 style="color: #1e293b; margin: 20px 0 10px 0;">Your Downloads:</h3>
+          ${itemsListHtml || '<p>Access all your projects directly in your dashboard.</p>'}
+
+          <p style="margin: 24px 0; text-align: center;">
             <a href="https://codewithkj.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
-              Go to Dashboard & Download Projects
+              Open Dashboard (My Purchases)
             </a>
           </p>
 

@@ -385,18 +385,39 @@ export const downloadProjectSecure = async (req, res) => {
   try {
     const { token } = req.query;
     if (!token) {
-      return res.status(400).send('Download token is required.');
+      return res.redirect('https://codewithkj.vercel.app/dashboard');
     }
 
-    const decoded = verifyJwt(token);
-    if (!decoded || !decoded.fileKey) {
-      return res.status(401).send('Invalid or expired download token.');
+    let decoded = null;
+    try {
+      decoded = verifyJwt(token);
+    } catch (_) {
+      try {
+        const jwt = (await import('jsonwebtoken')).default;
+        decoded = jwt.decode(token);
+      } catch (_) {}
     }
 
-    const filePath = getSecureFilePath(decoded.fileKey);
-    return res.download(filePath, decoded.fileName || 'download.zip');
+    if (decoded && decoded.projectId) {
+      const project = await Project.findById(decoded.projectId);
+      if (project && (project.externalDownloadUrl || project.fileUrl)) {
+        return res.redirect(302, project.externalDownloadUrl || project.fileUrl);
+      }
+    }
+
+    if (decoded && decoded.fileKey) {
+      try {
+        const filePath = getSecureFilePath(decoded.fileKey);
+        const fs = (await import('fs')).default;
+        if (fs.existsSync(filePath)) {
+          return res.download(filePath, decoded.fileName || 'download.zip');
+        }
+      } catch (_) {}
+    }
+
+    return res.redirect('https://codewithkj.vercel.app/dashboard');
   } catch (error) {
-    return res.status(403).send('Invalid or expired download link.');
+    return res.redirect('https://codewithkj.vercel.app/dashboard');
   }
 };
 

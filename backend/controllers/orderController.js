@@ -299,22 +299,12 @@ export const verifyUtrOrder = async (req, res) => {
 
     for (const item of order.items) {
       if (!item.project) continue;
-      const fileKey = item.project.fileKey || '';
-      const fileName = item.project.fileName || 'download.zip';
-      const projectIdStr = item.project._id ? item.project._id.toString() : '';
-
-      const downloadUrl = generateSignedDownloadUrl(
-        fileKey,
-        fileName,
-        userIdStr,
-        projectIdStr,
-        order._id.toString(),
-        hostUrl
-      );
+      const proj = item.project;
+      const directUrl = proj.externalDownloadUrl || proj.fileUrl || item.externalDownloadUrl || item.fileUrl || 'https://codewithkj.vercel.app/dashboard';
 
       downloadLinks.push({
-        title: item.project.title || item.titleAtPurchase || 'Download Link',
-        downloadUrl,
+        title: proj.title || item.titleAtPurchase || 'Download Link',
+        downloadUrl: directUrl,
       });
     }
 

@@ -86,38 +86,45 @@ export const sendPurchaseEmail = async (toEmail, userName, order, downloadLinks)
   const linksHtml = downloadLinks
     .map(
       (link) =>
-        `<div style="margin: 15px 0; padding: 12px; background: #f0f4f9; border-radius: 6px;">
-          <h4 style="margin: 0 0 5px 0; color: #1e293b;">${link.title}</h4>
-          <a href="${link.downloadUrl}" style="background: #2563eb; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; display: inline-block; font-size: 14px; font-weight: bold;">Download Project</a>
-          <p style="margin: 5px 0 0 0; font-size: 11px; color: #64748b;">Link expires in 15 minutes. Download from your dashboard anytime.</p>
+        `<div style="margin: 15px 0; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+          <h4 style="margin: 0 0 10px 0; color: #1e293b; font-size: 16px;">📦 ${link.title}</h4>
+          <a href="${link.downloadUrl}" target="_blank" style="background: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block; font-size: 14px; font-weight: bold;">
+            ⬇️ Download Project Source Code
+          </a>
+          <p style="margin: 10px 0 0 0; font-size: 12px; color: #64748b; word-break: break-all;">
+            Direct Link: <a href="${link.downloadUrl}" target="_blank" style="color: #2563eb;">${link.downloadUrl}</a>
+          </p>
         </div>`
     )
     .join('');
 
   const htmlContent = `
-    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; color: #334155; line-height: 1.6;">
-      <h2 style="color: #2563eb; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Purchase Confirmation</h2>
-      <p>Hello ${userName},</p>
-      <p>Thank you for shopping at Digital Project Marketplace! Your payment was successful, and your projects are ready for download.</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #334155; line-height: 1.6; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+      <h2 style="color: #10b981; margin-top: 0; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">🎉 Payment Approved & Order Confirmed!</h2>
+      <p>Hello ${userName || 'Developer'},</p>
+      <p>Thank you for shopping at ApexMarket! Your payment has been verified and your source code is ready for download.</p>
       
-      <h3>Order Details</h3>
-      <p><strong>Order ID:</strong> ${order.razorpayOrderId}</p>
-      <p><strong>Total Amount Paid:</strong> INR ${order.totalAmount}</p>
-      <ul>
-        ${itemsListHtml}
-      </ul>
+      <div style="background: #f8fafc; padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 16px 0;">
+        <p style="margin: 0 0 6px 0;"><strong>Invoice ID:</strong> ${order.invoiceNumber || order.razorpayOrderId || order._id}</p>
+        <p style="margin: 0;"><strong>Total Paid:</strong> INR ₹${order.totalAmount}</p>
+      </div>
 
-      <h3>Download Links</h3>
-      <p>Click the buttons below to download your files:</p>
+      <h3 style="color: #1e293b; margin-top: 20px;">Download Your Projects:</h3>
       ${linksHtml}
 
-      <p style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 13px; color: #94a3b8;">
-        Need help? Reply to this email or visit our Support Chat.
+      <div style="margin: 24px 0; text-align: center;">
+        <a href="https://codewithkj.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+          Open Dashboard (My Purchases)
+        </a>
+      </div>
+
+      <p style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 12px; color: #94a3b8;">
+        ApexMarket Support • khushaljangra721@gmail.com
       </p>
     </div>
   `;
 
-  const subject = `Your Purchase Confirmation - Order ${order.razorpayOrderId || order._id}`;
+  const subject = `🎉 Download Unlocked: Order #${order.invoiceNumber || order.razorpayOrderId || order._id}`;
 
   if (smtpUser && smtpPass) {
     const sent = await sendMailViaVercelBridge(toEmail, subject, htmlContent);
