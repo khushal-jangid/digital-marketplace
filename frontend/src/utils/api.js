@@ -4,8 +4,16 @@
  * failures are surfaced as real errors so bugs never hide silently.
  */
 
+const LIVE_RENDER_API = 'https://digital-marketplace-1ni7.onrender.com/api';
+
 const getNormalizedApiUrl = (endpoint) => {
-  const rawBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+  let rawBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+
+  // If environment variable is missing or pointing to stale/dead Render instance, use active Render URL
+  if (!rawBase || rawBase.includes('markt-backend-bocp') || rawBase.includes('localhost')) {
+    rawBase = LIVE_RENDER_API;
+  }
+
   const baseWithoutApi = rawBase.endsWith('/api') ? rawBase.slice(0, -4) : rawBase;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const pathWithApi = cleanEndpoint.startsWith('/api/') || cleanEndpoint === '/api'
