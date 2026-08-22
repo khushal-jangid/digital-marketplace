@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://digital-marketplace-1ni7.onrender.com/api/"
+      "destination": "/api/index.js"
     },
     {
       "source": "/(.*)",
