@@ -33,7 +33,9 @@ const CouponBanner = () => {
     setDismissed(true);
   };
 
-  if (dismissed || !activeCoupon) return null;
+  if (dismissed || !activeCoupon || (activeCoupon.code && activeCoupon.code.toUpperCase().startsWith('FLASH'))) {
+    return null;
+  }
 
   return (
     <div

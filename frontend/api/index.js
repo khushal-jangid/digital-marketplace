@@ -694,7 +694,29 @@ app.post('/api/coupons/apply', async (req, res) => {
   try {
     const { code } = req.body;
     if (!code) return res.status(400).json({ success: false, message: 'Promo code required' });
-    const coupon = await Coupon.findOne({ code: code.trim().toUpperCase(), isActive: true });
+    const cleanCode = code.trim().toUpperCase();
+
+    // 1. Check active Flash Sale code first
+    const flashSale = await FlashSale.findOne({ isActive: true });
+    if (flashSale && flashSale.promoCode && flashSale.promoCode.trim().toUpperCase() === cleanCode) {
+      if (flashSale.endTime && new Date() > new Date(flashSale.endTime)) {
+        return res.status(400).json({ success: false, message: 'Flash Sale promo code has expired' });
+      }
+      return res.json({
+        success: true,
+        message: `Flash Sale discount applied: ${flashSale.discountPercentage}% OFF!`,
+        coupon: {
+          code: flashSale.promoCode,
+          discountType: 'percentage',
+          discountValue: flashSale.discountPercentage,
+          targetProject: flashSale.targetProject,
+          targetProjectTitle: flashSale.targetProjectTitle,
+        },
+      });
+    }
+
+    // 2. Standard Coupon check
+    const coupon = await Coupon.findOne({ code: cleanCode, isActive: true });
     if (!coupon) return res.status(404).json({ success: false, message: 'Invalid or inactive coupon code' });
     if (coupon.expiryDate && new Date() > new Date(coupon.expiryDate)) {
       return res.status(400).json({ success: false, message: 'Coupon has expired' });
@@ -704,6 +726,19 @@ app.post('/api/coupons/apply', async (req, res) => {
       message: `Coupon applied: ${coupon.discountValue}${coupon.discountType === 'percentage' ? '%' : ' INR'} OFF!`,
       coupon,
     });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.get('/api/coupons/latest-active', async (req, res) => {
+  try {
+    const latest = await Coupon.findOne({
+      isActive: true,
+      code: { $not: /^FLASH/i },
+      $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }],
+    }).sort({ createdAt: -1 });
+    res.json({ success: true, coupon: latest });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -770,20 +805,6 @@ app.put('/api/flash-sale', authenticate, requireAdmin, async (req, res) => {
     flashSale.targetProjectTitle = targetProjectTitle || 'All Projects';
 
     await flashSale.save();
-
-    if (isSaleActive && formattedCode) {
-      await Coupon.findOneAndUpdate(
-        { code: formattedCode },
-        {
-          code: formattedCode,
-          discountType: 'percentage',
-          discountValue: Number(discountPercentage) || 0,
-          expiryDate: endTime ? new Date(endTime) : null,
-          isActive: true,
-        },
-        { upsert: true }
-      );
-    }
 
     res.json({ success: true, message: `Flash Sale updated (${isSaleActive ? 'LIVE' : 'PAUSED'})!`, flashSale });
   } catch (err) {

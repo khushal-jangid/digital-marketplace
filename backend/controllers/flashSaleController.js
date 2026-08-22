@@ -103,33 +103,9 @@ export const updateFlashSale = async (req, res) => {
       );
     } catch (_) {}
 
-    // Auto-sync Coupon in database
-    if (isSaleActive && formattedCode) {
-      await Coupon.findOneAndUpdate(
-        { code: formattedCode },
-        {
-          code: formattedCode,
-          discountType: 'percentage',
-          discountValue: discountVal,
-          minOrderAmount: 0,
-          expiryDate: parsedEndTime,
-          usageLimit: 500,
-          isActive: true,
-          targetProject: parsedTargetProject,
-          targetProjectTitle: parsedTargetTitle,
-        },
-        { upsert: true, new: true }
-      );
-    } else if (formattedCode) {
-      await Coupon.findOneAndUpdate(
-        { code: formattedCode },
-        { isActive: false }
-      );
-    }
-
     return res.json({
       success: true,
-      message: `Flash Sale is now ${isSaleActive ? 'ACTIVE (LIVE)' : 'INACTIVE (PAUSED)'} and synced with promo coupon!`,
+      message: `Flash Sale is now ${isSaleActive ? 'ACTIVE (LIVE)' : 'INACTIVE (PAUSED)'}!`,
       flashSale,
     });
   } catch (error) {
