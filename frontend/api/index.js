@@ -875,6 +875,15 @@ app.post('/api/orders/reject-utr/:id', authenticate, requireAdmin, async (req, r
   }
 });
 
+app.delete('/api/orders/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    await Order.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Transaction record deleted successfully.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 app.get('/api/orders/my-orders', authenticate, async (req, res) => {
   try {
     const orders = await Order.find({

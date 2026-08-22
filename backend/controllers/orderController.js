@@ -485,6 +485,16 @@ export const saveAbandonedLead = async (req, res) => {
   }
 };
 
+export const deleteOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Order.findByIdAndDelete(id);
+    return res.json({ success: true, message: 'Order permanently deleted' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const sendRecoveryEmails = async (req, res) => {
   try {
     const leads = await AbandonedLead.find({ recoveryEmailSent: false }).limit(20);
