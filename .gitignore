@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Production builds
+dist/
+**/dist/
+dist-ssr/
+**/dist-ssr/
+
+# Environment files
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local build / cache / temporary files
+.vercel/
+.gemini/
+brain/
+scratch/
+.system_generated/
+uploads/*
+!uploads/.gitkeep
+
