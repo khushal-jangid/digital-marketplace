@@ -242,18 +242,27 @@ async function sendTelegramAlert(text) {
 }
 
 async function sendMailNotification(to, subject, html) {
+  if (!to || !to.includes('@')) {
+    console.warn('[MAIL WARNING] Invalid recipient email:', to);
+    return false;
+  }
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: { user: SMTP_USER, pass: SMTP_PASS },
     });
-    await transporter.sendMail({
-      from: `"ApexMarket" <${SMTP_USER}>`,
+    const info = await transporter.sendMail({
+      from: `"ApexMarket Support" <${SMTP_USER}>`,
       to,
       subject,
       html,
     });
-  } catch (_) {}
+    console.log(`[MAIL SUCCESS] Successfully dispatched email to: ${to} (ID: ${info.messageId})`);
+    return true;
+  } catch (err) {
+    console.error(`[MAIL ERROR] Failed to send email to ${to}:`, err.message);
+    return false;
+  }
 }
 
 // Authentication Helpers
@@ -594,13 +603,99 @@ app.put('/api/orders/:id/status', authenticate, requireAdmin, async (req, res) =
           </p>
         </div>
       `;
-      sendMailNotification(
+      await sendMailNotification(
         order.userEmail,
         `🎉 Payment Approved! Your Download is Ready - ${order.invoiceNumber || order._id}`,
         html
       );
     }
     res.json({ success: true, message: `Order marked as ${paymentStatus}`, order });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/orders/verify-utr/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const order = await Order.findByIdAndUpdate(req.params.id, { paymentStatus: 'paid' }, { new: true }).populate('projects');
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    const targetEmail = order.userEmail || order.contactEmail;
+    if (targetEmail) {
+      const itemsListHtml = (order.projects || []).map((p) => `<li><strong>${p.title}</strong> - ₹${p.price}</li>`).join('');
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+          <h2 style="color: #10b981; margin-top: 0;">🎉 Payment Approved & Download Unlocked!</h2>
+          <p>Hello,</p>
+          <p>Your payment for order <strong>#${order.invoiceNumber || order._id}</strong> has been successfully verified and approved.</p>
+          
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0 0 8px 0;"><strong>Invoice ID:</strong> ${order.invoiceNumber || order._id}</p>
+            <p style="margin: 0 0 8px 0;"><strong>Amount Paid:</strong> ₹${order.totalAmount}</p>
+            <p style="margin: 0 0 8px 0;"><strong>UTR / Reference:</strong> ${order.utrNumber || 'Verified'}</p>
+            <p style="margin: 0;"><strong>Status:</strong> <span style="color: #10b981; font-weight: bold;">PAID (Access Unlocked)</span></p>
+            ${itemsListHtml ? `<ul style="margin: 12px 0 0 0; padding-left: 20px;">${itemsListHtml}</ul>` : ''}
+          </div>
+
+          <p style="margin: 20px 0;">
+            <a href="https://codewithkj.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
+              Go to Dashboard & Download Projects
+            </a>
+          </p>
+
+          <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px;">
+            Thank you for shopping with us! If you need support, reply directly to this email.
+          </p>
+        </div>
+      `;
+      await sendMailNotification(
+        targetEmail,
+        `🎉 Payment Verified! Download Your Code - ${order.invoiceNumber || order._id}`,
+        html
+      );
+    }
+
+    sendTelegramAlert(`✅ <b>ORDER APPROVED & UNLOCKED!</b>\n\n📄 <b>Invoice:</b> ${order.invoiceNumber || order._id}\n💰 <b>Amount:</b> ₹${order.totalAmount}\n👤 <b>Customer:</b> ${targetEmail || 'Customer'}`);
+
+    res.json({ success: true, message: 'Order verified and download links unlocked successfully.', order });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/orders/reject-utr/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { reason } = req.body || {};
+    const order = await Order.findByIdAndUpdate(req.params.id, { paymentStatus: 'failed' }, { new: true });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    const targetEmail = order.userEmail || order.contactEmail;
+    if (targetEmail) {
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #fee2e2; border-radius: 12px; background: #ffffff;">
+          <h2 style="color: #ef4444; margin-top: 0;">Payment Verification Failed</h2>
+          <p>Hello,</p>
+          <p>We were unable to verify the UPI Transaction (UTR) for order <strong>#${order.invoiceNumber || order._id}</strong>.</p>
+          
+          <div style="background: #fef2f2; border: 1px solid #fee2e2; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0 0 8px 0;"><strong>Submitted UTR:</strong> ${order.utrNumber || 'N/A'}</p>
+            <p style="margin: 0 0 8px 0;"><strong>Reason:</strong> ${reason || 'Invalid or unconfirmed UTR reference number'}</p>
+            <p style="margin: 0;"><strong>Action Required:</strong> Please verify with your bank or reply to this email with payment proof.</p>
+          </div>
+
+          <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px;">
+            ApexMarket Help Desk • khushaljangra721@gmail.com
+          </p>
+        </div>
+      `;
+      await sendMailNotification(
+        targetEmail,
+        `Payment Verification Failed - Order ${order.invoiceNumber || order._id}`,
+        html
+      );
+    }
+
+    res.json({ success: true, message: 'Order rejected successfully.', order });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -1024,7 +1119,7 @@ app.post('/api/support/send-email', async (req, res) => {
         <p style="line-height: 1.6; color: #334155; white-space: pre-wrap; background: #fdfdfd; padding: 12px; border: 1px dashed #cbd5e1; border-radius: 6px;">${message}</p>
       </div>
     `;
-    sendMailNotification('khushaljangra721@gmail.com', `📩 New Support Ticket: ${subject} (${name})`, adminHtml);
+    await sendMailNotification('khushaljangra721@gmail.com', `📩 New Support Ticket: ${subject} (${name})`, adminHtml);
 
     // 2. Acknowledgment email to Customer
     if (email && email.includes('@')) {
@@ -1041,13 +1136,87 @@ app.post('/api/support/send-email', async (req, res) => {
           </p>
         </div>
       `;
-      sendMailNotification(email, `Support Ticket Received: ${subject}`, userHtml);
+      await sendMailNotification(email, `Support Ticket Received: ${subject}`, userHtml);
     }
 
     // 3. Instant Telegram alert to Admin
     sendTelegramAlert(`📩 <b>NEW SUPPORT TICKET RECEIVED!</b>\n\n👤 <b>Client:</b> ${name} (${email})\n📌 <b>Subject:</b> ${subject}\n📝 <b>Message:</b> ${message}`);
 
     res.json({ success: true, message: 'Your support ticket email has been sent successfully!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Live Support Chat Routes
+app.get('/api/support', authenticate, async (req, res) => {
+  try {
+    const targetUserId = req.query.userId || req.user._id;
+    const messages = await ChatMessage.find({ userId: targetUserId.toString() }).sort({ createdAt: 1 });
+    res.json({ success: true, messages });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/support', authenticate, async (req, res) => {
+  try {
+    const { message, userId, userName, userEmail, isAdminReply } = req.body;
+    const chatUserId = (userId || req.user._id).toString();
+
+    const newMsg = await ChatMessage.create({
+      user: req.user._id,
+      userId: chatUserId,
+      userName: userName || req.user.name || 'Customer',
+      userEmail: userEmail || req.user.email || '',
+      senderRole: isAdminReply || req.user.role === 'admin' ? 'admin' : 'user',
+      message: message.trim(),
+    });
+
+    if (!isAdminReply && req.user.role !== 'admin') {
+      sendTelegramAlert(`💬 <b>NEW LIVE CHAT MESSAGE!</b>\n\n👤 <b>${userName || req.user.name}:</b> ${message}`);
+    }
+
+    res.status(201).json({ success: true, message: newMsg });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.get('/api/support/admin/chats', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const chats = await ChatMessage.aggregate([
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: '$userId',
+          userId: { $first: '$userId' },
+          lastMessage: { $first: '$message' },
+          userName: { $first: '$userName' },
+          userEmail: { $first: '$userEmail' },
+          updatedAt: { $first: '$createdAt' },
+        },
+      },
+      { $sort: { updatedAt: -1 } },
+    ]);
+
+    const formattedChats = chats.map((c) => ({
+      userId: c.userId,
+      user: { name: c.userName || 'Customer', email: c.userEmail || 'N/A' },
+      lastMessage: c.lastMessage,
+      updatedAt: c.updatedAt,
+    }));
+
+    res.json({ success: true, chats: formattedChats });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/support/chat/:userId', authenticate, requireAdmin, async (req, res) => {
+  try {
+    await ChatMessage.deleteMany({ userId: req.params.userId });
+    res.json({ success: true, message: 'Chat deleted successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
