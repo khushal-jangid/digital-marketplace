@@ -43,23 +43,17 @@ if (smtpHost && smtpUser && smtpPass) {
 
 const sendMailViaVercelBridge = async (toEmail, subject, htmlContent) => {
   const vercelUrl = process.env.VERCEL_MAILER_URL || 'https://codewithkj.vercel.app';
-  const securityToken = process.env.EMAIL_SECURITY_TOKEN || 'kj_secure_mail_token_2026';
 
   try {
     const response = await fetch(`${vercelUrl}/api/send-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-email-token': securityToken,
       },
       body: JSON.stringify({
         to: toEmail,
         subject,
         html: htmlContent,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
       }),
     });
 

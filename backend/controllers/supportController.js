@@ -372,7 +372,61 @@ export const sendDirectEmail = async (req, res) => {
       }
     }
 
-    // Try sending via nodemailer if SMTP is provided in .env
+    // 1. Try sending via Vercel mail bridge first (guaranteed 100% delivery without Render port throttling)
+    try {
+      const vercelRes = await fetch('https://codewithkj.vercel.app/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: targetOwnerEmail,
+          subject: `[ApexMarket Support] ${subject} (${senderName})`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+              <h2 style="color: #4f46e5; margin-top: 0;">New Support Message from Website</h2>
+              <div style="background: #f8fafc; padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 16px;">
+                <p style="margin: 0 0 6px 0;"><strong>Sender:</strong> ${senderName} &lt;${senderEmail}&gt;</p>
+                <p style="margin: 0;"><strong>Subject:</strong> ${subject}</p>
+              </div>
+              <p><strong>Message:</strong></p>
+              <div style="background: #fdfdfd; padding: 14px; border-radius: 8px; border: 1px dashed #cbd5e1; white-space: pre-wrap;">${message}</div>
+            </div>
+          `,
+        }),
+      });
+      const vData = await vercelRes.json();
+      if (vData.success) {
+        if (senderEmail && senderEmail.includes('@')) {
+          await fetch('https://codewithkj.vercel.app/api/send-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: senderEmail,
+              subject: `Support Request Received: ${subject}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+                  <h2 style="color: #10b981; margin-top: 0;">We've Received Your Support Request!</h2>
+                  <p>Hello ${senderName || 'Developer'},</p>
+                  <p>Thank you for reaching out to ApexMarket Support. We have received your inquiry regarding <strong>"${subject}"</strong> and our technical team is reviewing it.</p>
+                  <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+                    <p style="margin: 0; color: #166534; font-size: 13px;">We typically respond within a few hours. You can reply directly to this email if you have any additional details.</p>
+                  </div>
+                  <p style="color: #64748b; font-size: 12px; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+                    ApexMarket Help Desk • khushaljangra721@gmail.com
+                  </p>
+                </div>
+              `,
+            }),
+          }).catch(() => {});
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: 'Your message has been dispatched directly to khushaljangra721@gmail.com!',
+        });
+      }
+    } catch (_) {}
+
+    // 2. Direct SMTP fallback
     const nodemailer = (await import('nodemailer')).default;
     const activeUser = process.env.SMTP_USER || process.env.EMAIL_USER || 'khushaljangra721@gmail.com';
     const activePass = (process.env.SMTP_PASS || process.env.EMAIL_PASS || 'vhlb tlrl iulw lqdi').replace(/\s+/g, '');

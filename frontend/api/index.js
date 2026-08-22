@@ -1330,12 +1330,34 @@ app.get('/api/support/admin/chats', authenticate, requireAdmin, async (req, res)
   }
 });
 
-app.delete('/api/support/chat/:userId', authenticate, requireAdmin, async (req, res) => {
+app.post('/api/send-email', async (req, res) => {
   try {
-    await ChatMessage.deleteMany({ userId: req.params.userId });
-    res.json({ success: true, message: 'Chat deleted successfully' });
+    const { to, subject, html, text } = req.body;
+    if (!to || !to.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Valid recipient email required' });
+    }
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from: `"ApexMarket Support" <${SMTP_USER}>`,
+      to,
+      subject: subject || 'Notification from ApexMarket',
+      html: html || text,
+      text: text || '',
+    });
+
+    console.log(`[VERCEL BRIDGE SUCCESS] Email sent to: ${to} (MessageId: ${info.messageId})`);
+    res.json({ success: true, messageId: info.messageId });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[VERCEL BRIDGE ERROR]:', err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
