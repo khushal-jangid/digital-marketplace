@@ -35,7 +35,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_token_key_for_dig
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8865031996:AAFF85bx08Vaf1fr3WbaGuGvx3rMv_Sij0g';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7370155608';
 const SMTP_USER = process.env.EMAIL_USER || 'khushaljangra721@gmail.com';
-const SMTP_PASS = (process.env.EMAIL_PASS || 'vyea buxm iwfv mblu').replace(/\s+/g, '');
+const SMTP_PASS = (process.env.EMAIL_PASS || 'vhlb tlrl iulw lqdi').replace(/\s+/g, '');
 
 const KNOWN_JWT_SECRETS = [
   JWT_SECRET,
@@ -567,12 +567,37 @@ app.post('/api/orders', async (req, res) => {
 app.put('/api/orders/:id/status', authenticate, requireAdmin, async (req, res) => {
   try {
     const { paymentStatus } = req.body;
-    const order = await Order.findByIdAndUpdate(req.params.id, { paymentStatus }, { new: true });
+    const order = await Order.findByIdAndUpdate(req.params.id, { paymentStatus }, { new: true }).populate('projects');
     if (paymentStatus === 'paid' && order?.userEmail) {
+      const itemsListHtml = (order.projects || []).map((p) => `<li><strong>${p.title}</strong> - ₹${p.price}</li>`).join('');
+      const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+          <h2 style="color: #10b981; margin-top: 0;">🎉 Payment Approved & Order Confirmed!</h2>
+          <p>Hello,</p>
+          <p>Your payment for order <strong>#${order.invoiceNumber || order._id}</strong> has been verified and approved by the administrator.</p>
+          
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0 0 8px 0;"><strong>Invoice ID:</strong> ${order.invoiceNumber || order._id}</p>
+            <p style="margin: 0 0 8px 0;"><strong>Amount Paid:</strong> ₹${order.totalAmount}</p>
+            <p style="margin: 0;"><strong>Payment Method:</strong> ${order.paymentMethod || 'UPI Direct Transfer'}</p>
+            ${itemsListHtml ? `<ul style="margin: 12px 0 0 0; padding-left: 20px;">${itemsListHtml}</ul>` : ''}
+          </div>
+
+          <p style="margin: 20px 0;">
+            <a href="https://codewithkj.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
+              Go to Dashboard & Download Projects
+            </a>
+          </p>
+
+          <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px;">
+            Thank you for shopping at ApexMarket! If you have any questions, you can reply directly to this email.
+          </p>
+        </div>
+      `;
       sendMailNotification(
         order.userEmail,
-        `🎉 Payment Approved! Your Download is Ready - ${order.invoiceNumber}`,
-        `<h2>Payment Confirmed!</h2><p>Your order <strong>${order.invoiceNumber}</strong> has been approved. Log in to your dashboard to download your source code.</p>`
+        `🎉 Payment Approved! Your Download is Ready - ${order.invoiceNumber || order._id}`,
+        html
       );
     }
     res.json({ success: true, message: `Order marked as ${paymentStatus}`, order });
@@ -985,8 +1010,43 @@ app.delete('/api/reviews/:id', authenticate, requireAdmin, async (req, res) => {
 app.post('/api/support/send-email', async (req, res) => {
   try {
     const { name, email, subject, message } = req.body;
-    sendMailNotification('khushaljangra721@gmail.com', `📩 New Support Ticket: ${subject}`, `<p><strong>From:</strong> ${name} (${email})</p><p>${message}</p>`);
-    sendTelegramAlert(`📩 <b>NEW SUPPORT EMAIL!</b>\n\n👤 ${name} (${email})\n📌 ${subject}\n📝 ${message}`);
+    
+    // 1. Email to Admin
+    const adminHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+        <h2 style="color: #4f46e5; margin-top: 0;">📩 New Customer Support Ticket</h2>
+        <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #e2e8f0;">
+          <p style="margin: 0 0 6px 0;"><strong>Name:</strong> ${name || 'Customer'}</p>
+          <p style="margin: 0 0 6px 0;"><strong>Email:</strong> ${email}</p>
+          <p style="margin: 0;"><strong>Subject:</strong> ${subject}</p>
+        </div>
+        <h3 style="color: #1e293b;">Message Content:</h3>
+        <p style="line-height: 1.6; color: #334155; white-space: pre-wrap; background: #fdfdfd; padding: 12px; border: 1px dashed #cbd5e1; border-radius: 6px;">${message}</p>
+      </div>
+    `;
+    sendMailNotification('khushaljangra721@gmail.com', `📩 New Support Ticket: ${subject} (${name})`, adminHtml);
+
+    // 2. Acknowledgment email to Customer
+    if (email && email.includes('@')) {
+      const userHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+          <h2 style="color: #10b981; margin-top: 0;">Support Request Received!</h2>
+          <p>Hello ${name || 'Developer'},</p>
+          <p>Thank you for reaching out to ApexMarket Support. We have received your inquiry regarding <strong>"${subject}"</strong> and our team is reviewing it.</p>
+          <div style="background: #f0fdf4; border-left: 4px solid #10b981; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+            <p style="margin: 0; color: #166534; font-size: 13px;">We typically respond within a few hours. You can reply directly to this email if you have any additional details.</p>
+          </div>
+          <p style="color: #64748b; font-size: 12px; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+            ApexMarket Help Desk • khushaljangra721@gmail.com
+          </p>
+        </div>
+      `;
+      sendMailNotification(email, `Support Ticket Received: ${subject}`, userHtml);
+    }
+
+    // 3. Instant Telegram alert to Admin
+    sendTelegramAlert(`📩 <b>NEW SUPPORT TICKET RECEIVED!</b>\n\n👤 <b>Client:</b> ${name} (${email})\n📌 <b>Subject:</b> ${subject}\n📝 <b>Message:</b> ${message}`);
+
     res.json({ success: true, message: 'Your support ticket email has been sent successfully!' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
