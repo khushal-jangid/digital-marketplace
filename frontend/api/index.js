@@ -1331,33 +1331,60 @@ app.post('/api/support/send-email', async (req, res) => {
   }
 });
 
-// Live Support Chat Routes
-app.get('/api/support', authenticate, async (req, res) => {
+// Live Support Chat Routes (Accessible to both logged-in users & guest visitors)
+app.get('/api/support', async (req, res) => {
   try {
-    const targetUserId = req.query.userId || req.user._id;
-    const messages = await ChatMessage.find({ userId: targetUserId.toString() }).sort({ createdAt: 1 });
+    let currentUserId = req.query.userId;
+    const authHeader = req.headers.authorization;
+    if (!currentUserId && authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.decode(token);
+        if (decoded) currentUserId = decoded.id || decoded.userId;
+      } catch (_) {}
+    }
+    const targetUserId = (currentUserId || 'guest_user').toString();
+    const messages = await ChatMessage.find({ userId: targetUserId }).sort({ createdAt: 1 });
     res.json({ success: true, messages });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-app.post('/api/support', authenticate, async (req, res) => {
+app.post('/api/support', async (req, res) => {
   try {
     const { message, userId, userName, userEmail, isAdminReply } = req.body;
-    const chatUserId = (userId || req.user._id).toString();
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message content is required' });
+    }
+
+    let authUser = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        authUser = jwt.decode(token);
+      } catch (_) {}
+    }
+
+    const isAdmin = isAdminReply || authUser?.role === 'admin';
+    const chatUserId = (userId || authUser?.id || authUser?.userId || 'guest_user').toString();
+    const senderName = userName || authUser?.name || 'Customer';
+    const senderEmail = userEmail || authUser?.email || 'N/A';
 
     const newMsg = await ChatMessage.create({
-      user: req.user._id,
+      user: authUser ? (authUser.id || authUser.userId) : null,
       userId: chatUserId,
-      userName: userName || req.user.name || 'Customer',
-      userEmail: userEmail || req.user.email || '',
-      senderRole: isAdminReply || req.user.role === 'admin' ? 'admin' : 'user',
+      userName: senderName,
+      userEmail: senderEmail,
+      senderRole: isAdmin ? 'admin' : 'user',
       message: message.trim(),
     });
 
-    if (!isAdminReply && req.user.role !== 'admin') {
-      sendTelegramAlert(`💬 <b>NEW LIVE CHAT MESSAGE!</b>\n\n👤 <b>${userName || req.user.name}:</b> ${message}`);
+    if (!isAdmin) {
+      sendTelegramAlert(
+        `💬 <b>NEW LIVE CHAT MESSAGE!</b>\n\n👤 <b>Customer:</b> ${senderName} (${senderEmail})\n📝 <b>Message:</b> ${message.trim()}\n\n👉 <i>Reply live at: https://codewithkj.vercel.app/support</i>`
+      );
     }
 
     res.status(201).json({ success: true, message: newMsg });
