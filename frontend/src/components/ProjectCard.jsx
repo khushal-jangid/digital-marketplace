@@ -8,11 +8,12 @@ import { Star, Heart, ShoppingCart, ArrowUpRight, Check } from 'lucide-react';
 const ProjectCard = ({ project }) => {
   if (!project || !project._id) return null;
 
-  const { user, toggleWishlist, isInWishlist } = useAuth();
+  const { user, toggleWishlist, isInWishlist, isPurchased } = useAuth();
   const { cartItems, addToCart } = useCart();
   const { formatPrice } = useCurrency();
   const navigate = useNavigate();
 
+  const isOwned = isPurchased ? isPurchased(project._id) : false;
   const isWishlisted = isInWishlist ? isInWishlist(project._id) : false;
   const inCart = (cartItems || []).some((item) => item && item._id === project._id);
 
@@ -145,7 +146,26 @@ const ProjectCard = ({ project }) => {
           <Heart size={15} fill={isWishlisted ? '#ffffff' : 'none'} />
         </button>
 
-        {isFeatured && (
+        {isOwned ? (
+          <span
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              fontSize: '10px',
+              fontWeight: '800',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4)',
+            }}
+          >
+            ✓ PURCHASED
+          </span>
+        ) : isFeatured ? (
           <span
             style={{
               position: 'absolute',
@@ -163,7 +183,7 @@ const ProjectCard = ({ project }) => {
           >
             POPULAR
           </span>
-        )}
+        ) : null}
       </div>
 
       {/* Card Body */}
@@ -249,29 +269,52 @@ const ProjectCard = ({ project }) => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCartClick}
-            className="btn btn-primary"
-            style={{
-              padding: '7px 12px',
-              fontSize: '12.5px',
-              borderRadius: 'var(--radius-sm)',
-              gap: '6px',
-            }}
-          >
-            {inCart ? (
-              <>
-                <Check size={14} />
-                <span>In Cart</span>
-              </>
-            ) : (
-              <>
-                <ShoppingCart size={14} />
-                <span>Add</span>
-              </>
-            )}
-          </button>
+          {isOwned ? (
+            <Link
+              to="/dashboard"
+              style={{
+                padding: '7px 12px',
+                fontSize: '12px',
+                fontWeight: '700',
+                borderRadius: 'var(--radius-sm)',
+                gap: '5px',
+                background: 'rgba(34, 197, 94, 0.15)',
+                color: '#22c55e',
+                border: '1px solid rgba(34, 197, 94, 0.4)',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <Check size={14} strokeWidth={2.5} />
+              <span>Purchased</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={handleCartClick}
+              className="btn btn-primary"
+              style={{
+                padding: '7px 12px',
+                fontSize: '12.5px',
+                borderRadius: 'var(--radius-sm)',
+                gap: '6px',
+              }}
+            >
+              {inCart ? (
+                <>
+                  <Check size={14} />
+                  <span>In Cart</span>
+                </>
+              ) : (
+                <>
+                  <ShoppingCart size={14} />
+                  <span>Add</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
       </div>

@@ -592,6 +592,59 @@ app.get('/api/orders/my-orders', authenticate, async (req, res) => {
   }
 });
 
+app.get('/api/orders/my-purchases', authenticate, async (req, res) => {
+  try {
+    const orders = await Order.find({
+      $or: [{ user: req.user?._id }, { userEmail: req.user?.email }],
+      paymentStatus: { $in: ['paid', 'completed', 'fulfilled'] },
+    }).populate('projects items.project');
+
+    const purchasesMap = new Map();
+    orders.forEach((order) => {
+      if (Array.isArray(order.items)) {
+        order.items.forEach((item) => {
+          const proj = item.project;
+          if (proj) {
+            const pId = (proj._id || proj.id || proj).toString();
+            if (!purchasesMap.has(pId)) {
+              purchasesMap.set(pId, {
+                _id: pId,
+                project: proj,
+                orderId: order._id,
+                purchaseDate: order.createdAt,
+                downloadUrl: proj.fileUrl || proj.externalDownloadUrl || item.fileUrl || item.externalDownloadUrl || '',
+                invoiceNumber: order.invoiceNumber,
+              });
+            }
+          }
+        });
+      }
+      if (Array.isArray(order.projects)) {
+        order.projects.forEach((proj) => {
+          if (proj) {
+            const pId = (proj._id || proj.id || proj).toString();
+            if (!purchasesMap.has(pId)) {
+              purchasesMap.set(pId, {
+                _id: pId,
+                project: proj,
+                orderId: order._id,
+                purchaseDate: order.createdAt,
+                downloadUrl: proj.fileUrl || proj.externalDownloadUrl || '',
+                invoiceNumber: order.invoiceNumber,
+              });
+            }
+          }
+        });
+      }
+    });
+
+    const purchases = Array.from(purchasesMap.values());
+    res.json({ success: true, count: purchases.length, purchases });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 app.get('/api/orders/:id/invoice', async (req, res) => {
   try {
     const order = await Order.findById(req.params.id).populate('projects', 'title price');

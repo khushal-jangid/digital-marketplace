@@ -22,7 +22,7 @@ import {
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, toggleWishlist, isInWishlist } = useAuth();
+  const { user, toggleWishlist, isInWishlist, isPurchased } = useAuth();
   const { cartItems, addToCart } = useCart();
   const { formatPrice } = useCurrency();
   const [selectedLicense, setSelectedLicense] = useState('personal');
@@ -32,6 +32,8 @@ const ProjectDetail = () => {
   const [loading, setLoading] = useState(true);
   const [hasPurchased, setHasPurchased] = useState(false);
   const [userAlreadyReviewed, setUserAlreadyReviewed] = useState(false);
+
+  const isOwned = hasPurchased || (isPurchased ? isPurchased(id) : false);
 
   // Review Form States
   const [rating, setRating] = useState(5);
@@ -136,12 +138,24 @@ const ProjectDetail = () => {
       }
 
       const data = await request(endpoint, 'GET');
-      if (data.success && data.downloadUrl) {
-        // Trigger file download by redirecting to the signed URL proxy
-        window.location.href = data.downloadUrl;
+      const url = data?.downloadUrl || project?.externalDownloadUrl || project?.fileUrl;
+      if (url) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        navigate('/dashboard');
       }
     } catch (error) {
-      alert(error.message || 'Download failed. Ensure purchase is valid.');
+      if (project?.externalDownloadUrl || project?.fileUrl) {
+        window.open(project.externalDownloadUrl || project.fileUrl, '_blank');
+      } else {
+        navigate('/dashboard');
+      }
     }
   };
 
@@ -579,22 +593,67 @@ const ProjectDetail = () => {
               </div>
             </div>
 
-            <button
-              onClick={handleAddToCart}
-              className="btn btn-primary"
-              style={{ width: '100%', padding: '14px', marginTop: '10px' }}
-            >
-              <ShoppingCart size={18} />
-              {inCart ? 'Go to Shopping Cart' : `Buy ${selectedLicense === 'commercial' ? 'Commercial' : 'Personal'} (${formatPrice(selectedLicense === 'commercial' ? Math.round(project.price * 2.2) : project.price)})`}
-            </button>
-            
-            {hasPurchased && (
+            {isOwned ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
+                <div
+                  style={{
+                    padding: '14px',
+                    borderRadius: '8px',
+                    background: 'rgba(34, 197, 94, 0.15)',
+                    border: '1px solid rgba(34, 197, 94, 0.4)',
+                    color: '#22c55e',
+                    fontWeight: '700',
+                    fontSize: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <CheckCircle size={18} />
+                  <span>You Already Own This Project</span>
+                </div>
+
+                <button
+                  onClick={() => handleDownloadFile()}
+                  className="btn btn-accent"
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <Download size={18} /> Download Source Code
+                </button>
+
+                <Link
+                  to="/dashboard"
+                  className="btn btn-secondary"
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    fontSize: '13px',
+                    textAlign: 'center',
+                    textDecoration: 'none',
+                    display: 'block',
+                  }}
+                >
+                  View in My Purchases / Dashboard
+                </Link>
+              </div>
+            ) : (
               <button
-                onClick={() => handleDownloadFile()}
-                className="btn btn-accent"
-                style={{ width: '100%', padding: '12px' }}
+                onClick={handleAddToCart}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '14px', marginTop: '10px' }}
               >
-                <Download size={16} /> Instant Download (v{project.versions?.length ? project.versions[project.versions.length-1].version : '1.0.0'})
+                <ShoppingCart size={18} />
+                {inCart ? 'Go to Shopping Cart' : `Buy ${selectedLicense === 'commercial' ? 'Commercial' : 'Personal'} (${formatPrice(selectedLicense === 'commercial' ? Math.round(project.price * 2.2) : project.price)})`}
               </button>
             )}
           </div>
