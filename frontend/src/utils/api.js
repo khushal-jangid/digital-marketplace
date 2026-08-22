@@ -5,15 +5,7 @@
  */
 
 const getNormalizedApiUrl = (endpoint) => {
-  let rawBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
-
-  // If on Vercel production, prefer same-origin /api to avoid cross-origin CORS failures
-  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-    if (rawBase.includes('onrender.com')) {
-      rawBase = '';
-    }
-  }
-
+  const rawBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
   const baseWithoutApi = rawBase.endsWith('/api') ? rawBase.slice(0, -4) : rawBase;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const pathWithApi = cleanEndpoint.startsWith('/api/') || cleanEndpoint === '/api'
