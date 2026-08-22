@@ -567,6 +567,123 @@ app.post('/api/orders', async (req, res) => {
       `🛒 <b>NEW ORDER SUBMISSION RECEIVED!</b>\n\n📄 <b>Invoice:</b> ${invoiceNumber}\n💰 <b>Amount:</b> ₹${totalAmount}\n💳 <b>UTR:</b> ${utrNumber || 'N/A'}\n👤 <b>Customer:</b> ${contactEmail || 'N/A'} (${contactPhone || 'N/A'})\n📦 <b>Items:</b> ${items.map((i) => i.title).join(', ')}`
     );
 
+    if (contactEmail && contactEmail.includes('@')) {
+      const customerSubmissionHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+          <h2 style="color: #4f46e5; margin-top: 0;">Order Submitted for Verification</h2>
+          <p>Hello,</p>
+          <p>Thank you for your order on ApexMarket. We have received your payment submission with UTR <strong>${utrNumber || 'Submitted'}</strong>.</p>
+          
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0 0 8px 0;"><strong>Invoice ID:</strong> ${invoiceNumber}</p>
+            <p style="margin: 0 0 8px 0;"><strong>Amount:</strong> ₹${totalAmount}</p>
+            <p style="margin: 0 0 8px 0;"><strong>UTR Reference:</strong> ${utrNumber || 'N/A'}</p>
+            <p style="margin: 0;"><strong>Status:</strong> <span style="color: #f59e0b; font-weight: bold;">Pending Verification</span></p>
+          </div>
+
+          <p style="color: #334155; font-size: 14px;">
+            Our team is verifying your payment with the bank. Once approved, you will receive another email with your download links and the project will unlock on your <a href="https://codewithkj.vercel.app/dashboard">Dashboard</a>.
+          </p>
+
+          <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px;">
+            ApexMarket Support • khushaljangra721@gmail.com
+          </p>
+        </div>
+      `;
+      await sendMailNotification(contactEmail, `Order Received: #${invoiceNumber} (Pending Verification)`, customerSubmissionHtml);
+    }
+
+    res.status(201).json({ success: true, message: 'Order submitted for verification!', order: newOrder });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/orders/qr-checkout', async (req, res) => {
+  try {
+    const { projectIds, items, couponCode, transactionRef, contactEmail, contactPhone, referredByCode } = req.body;
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.decode(token);
+        userId = decoded.id || decoded.userId;
+      } catch (_) {}
+    }
+
+    const cleanEmail = (contactEmail || '').trim();
+    const cleanPhone = (contactPhone || '').trim();
+    const cleanUtr = (transactionRef || '').trim();
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Valid email required' });
+    }
+    if (!cleanUtr) {
+      return res.status(400).json({ success: false, message: 'Valid UPI UTR required' });
+    }
+
+    let selectedProjects = [];
+    if (Array.isArray(projectIds) && projectIds.length > 0) {
+      selectedProjects = await Project.find({ _id: { $in: projectIds } });
+    } else if (Array.isArray(items) && items.length > 0) {
+      selectedProjects = items;
+    }
+
+    const calculatedTotal = selectedProjects.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
+    const invoiceNumber = 'INV-' + Date.now().toString().slice(-6);
+
+    const orderItems = selectedProjects.map((p) => ({
+      project: p._id || p.id,
+      title: p.title,
+      price: p.price,
+      fileUrl: p.fileUrl || p.externalDownloadUrl || '',
+      externalDownloadUrl: p.externalDownloadUrl || p.fileUrl || '',
+    }));
+
+    const newOrder = await Order.create({
+      user: userId,
+      userEmail: cleanEmail,
+      customerPhone: cleanPhone,
+      projects: selectedProjects.map((p) => p._id || p.id),
+      items: orderItems,
+      totalAmount: calculatedTotal,
+      paymentStatus: 'pending_verification',
+      paymentMethod: 'UPI Direct Transfer',
+      utrNumber: cleanUtr,
+      invoiceNumber,
+    });
+
+    // 1. Send immediate confirmation email to customer
+    const customerSubmissionHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+        <h2 style="color: #4f46e5; margin-top: 0;">Order Submitted for Verification</h2>
+        <p>Hello,</p>
+        <p>Thank you for your order on ApexMarket. We have received your payment submission with UTR <strong>${cleanUtr}</strong>.</p>
+        
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0 0 8px 0;"><strong>Invoice ID:</strong> ${invoiceNumber}</p>
+          <p style="margin: 0 0 8px 0;"><strong>Amount:</strong> ₹${calculatedTotal}</p>
+          <p style="margin: 0 0 8px 0;"><strong>UTR Reference:</strong> ${cleanUtr}</p>
+          <p style="margin: 0;"><strong>Status:</strong> <span style="color: #f59e0b; font-weight: bold;">Pending Verification</span></p>
+        </div>
+
+        <p style="color: #334155; font-size: 14px;">
+          Our team is verifying your payment with the bank. Once approved, you will receive another email with your download links and the project will unlock on your <a href="https://codewithkj.vercel.app/dashboard">Dashboard</a>.
+        </p>
+
+        <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px;">
+          ApexMarket Support • khushaljangra721@gmail.com
+        </p>
+      </div>
+    `;
+    await sendMailNotification(cleanEmail, `Order Received: #${invoiceNumber} (Pending Verification)`, customerSubmissionHtml);
+
+    // 2. Send instant Telegram alert to admin
+    sendTelegramAlert(
+      `🛒 <b>NEW UPI ORDER RECEIVED!</b>\n\n📄 <b>Invoice:</b> ${invoiceNumber}\n💰 <b>Amount:</b> ₹${calculatedTotal}\n💳 <b>UTR:</b> ${cleanUtr}\n👤 <b>Customer:</b> ${cleanEmail} (${cleanPhone})\n📦 <b>Items:</b> ${selectedProjects.map((i) => i.title).join(', ')}`
+    );
+
     res.status(201).json({ success: true, message: 'Order submitted for verification!', order: newOrder });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
