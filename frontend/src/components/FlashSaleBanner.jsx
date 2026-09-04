@@ -1,7 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Copy, Check, ArrowRight, X, Flame } from 'lucide-react';
+import { Clock, Copy, Check, ArrowRight, X, Sparkles, Tag } from 'lucide-react';
 import { request } from '../utils/api';
+
+const THEME_STYLES = {
+  diwali: {
+    containerBg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(217, 119, 6, 0.18) 50%, rgba(220, 38, 38, 0.16) 100%)',
+    borderColor: 'rgba(245, 158, 11, 0.45)',
+    boxShadow: '0 10px 25px -5px rgba(245, 158, 11, 0.25)',
+    badgeBg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+    badgeIcon: '🪔',
+    accentColor: '#f59e0b',
+  },
+  holi: {
+    containerBg: 'linear-gradient(135deg, rgba(236, 72, 153, 0.22) 0%, rgba(139, 92, 246, 0.2) 50%, rgba(6, 182, 212, 0.18) 100%)',
+    borderColor: 'rgba(236, 72, 153, 0.45)',
+    boxShadow: '0 10px 25px -5px rgba(236, 72, 153, 0.25)',
+    badgeBg: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #06b6d4 100%)',
+    badgeIcon: '🎨',
+    accentColor: '#ec4899',
+  },
+  republic_day: {
+    containerBg: 'linear-gradient(135deg, rgba(249, 115, 22, 0.22) 0%, rgba(255, 255, 255, 0.08) 50%, rgba(16, 185, 129, 0.2) 100%)',
+    borderColor: 'rgba(249, 115, 22, 0.45)',
+    boxShadow: '0 10px 25px -5px rgba(249, 115, 22, 0.2)',
+    badgeBg: 'linear-gradient(135deg, #f97316 0%, #0284c7 50%, #10b981 100%)',
+    badgeIcon: '🇮🇳',
+    accentColor: '#f97316',
+  },
+  independence_day: {
+    containerBg: 'linear-gradient(135deg, rgba(249, 115, 22, 0.22) 0%, rgba(255, 255, 255, 0.08) 50%, rgba(16, 185, 129, 0.2) 100%)',
+    borderColor: 'rgba(249, 115, 22, 0.45)',
+    boxShadow: '0 10px 25px -5px rgba(249, 115, 22, 0.2)',
+    badgeBg: 'linear-gradient(135deg, #f97316 0%, #0284c7 50%, #10b981 100%)',
+    badgeIcon: '🇮🇳',
+    accentColor: '#f97316',
+  },
+  new_year: {
+    containerBg: 'linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(236, 72, 153, 0.18) 50%, rgba(234, 179, 8, 0.18) 100%)',
+    borderColor: 'rgba(168, 85, 247, 0.45)',
+    boxShadow: '0 10px 25px -5px rgba(168, 85, 247, 0.25)',
+    badgeBg: 'linear-gradient(135deg, #a855f7 0%, #eab308 100%)',
+    badgeIcon: '🎆',
+    accentColor: '#a855f7',
+  },
+  flash: {
+    containerBg: 'linear-gradient(135deg, rgba(79, 70, 229, 0.18) 0%, rgba(244, 63, 94, 0.15) 50%, rgba(245, 158, 11, 0.15) 100%)',
+    borderColor: 'rgba(244, 63, 94, 0.35)',
+    boxShadow: '0 10px 25px -5px rgba(244, 63, 94, 0.12)',
+    badgeBg: 'linear-gradient(135deg, #f43f5e 0%, #ea580c 100%)',
+    badgeIcon: '⚡',
+    accentColor: '#f43f5e',
+  },
+};
 
 const FlashSaleBanner = () => {
   const [saleData, setSaleData] = useState(null);
@@ -10,7 +61,7 @@ const FlashSaleBanner = () => {
   const [isDismissed, setIsDismissed] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
 
-  // Fetch active flash sale configuration from server
+  // Fetch active flash/festival sale configuration from server
   useEffect(() => {
     const fetchFlashSale = async () => {
       try {
@@ -66,7 +117,11 @@ const FlashSaleBanner = () => {
 
   const promoCode = saleData.promoCode || 'FLASH35';
   const discountPercent = saleData.discountPercentage || 35;
-  const title = saleData.title || `Get Flat ${discountPercent}% OFF on all Full-Stack & Developer Templates!`;
+  const title = saleData.title || `Special Festival Offer: Flat ${discountPercent}% OFF!`;
+  const themeKey = saleData.festivalTheme || 'flash';
+  const theme = THEME_STYLES[themeKey] || THEME_STYLES.flash;
+  const badgeLabel = saleData.badge || 'FESTIVAL SALE';
+  const isStorewide = !saleData.targetProject || saleData.targetProject === 'all';
 
   const handleCopy = (e) => {
     e.preventDefault();
@@ -89,8 +144,8 @@ const FlashSaleBanner = () => {
     >
       <div
         style={{
-          background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.18) 0%, rgba(244, 63, 94, 0.15) 50%, rgba(245, 158, 11, 0.15) 100%)',
-          border: '1px solid rgba(244, 63, 94, 0.35)',
+          background: theme.containerBg,
+          border: `1px solid ${theme.borderColor}`,
           borderRadius: '16px',
           padding: '16px 24px',
           display: 'flex',
@@ -99,16 +154,16 @@ const FlashSaleBanner = () => {
           flexWrap: 'wrap',
           gap: '16px',
           position: 'relative',
-          boxShadow: '0 10px 25px -5px rgba(244, 63, 94, 0.12)',
+          boxShadow: theme.boxShadow,
         }}
       >
         {/* Left Side: Badge & Deal Info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
           <div
             style={{
-              background: 'linear-gradient(135deg, #f43f5e 0%, #ea580c 100%)',
+              background: theme.badgeBg,
               color: '#ffffff',
-              padding: '6px 12px',
+              padding: '6px 14px',
               borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
@@ -116,28 +171,65 @@ const FlashSaleBanner = () => {
               fontSize: '12px',
               fontWeight: 800,
               letterSpacing: '0.5px',
-              boxShadow: '0 4px 12px rgba(244, 63, 94, 0.35)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
             }}
           >
-            <Flame size={15} />
-            <span>FLASH DEAL</span>
+            <span>{theme.badgeIcon}</span>
+            <span>{badgeLabel}</span>
           </div>
 
           <div>
-            <h4
-              style={{
-                fontSize: '15.5px',
-                fontWeight: 700,
-                color: 'var(--text-primary)',
-                margin: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <span>{title}</span>
-            </h4>
-            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h4
+                style={{
+                  fontSize: '15.5px',
+                  fontWeight: 700,
+                  color: 'var(--text-primary)',
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>{title}</span>
+              </h4>
+
+              {isStorewide ? (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#10b981',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Tag size={11} />
+                  <span>Valid Storewide on ALL Projects!</span>
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    color: '#818cf8',
+                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                  }}
+                >
+                  🎯 For: {saleData.targetProjectTitle || 'Selected Project'}
+                </span>
+              )}
+            </div>
+
+            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
               {saleData.subtitle || 'Copy code below and paste at checkout for instant discount!'}
             </p>
           </div>
@@ -145,9 +237,9 @@ const FlashSaleBanner = () => {
 
         {/* Center: Live Ticking Countdown */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f43f5e', fontSize: '12px', fontWeight: 600, marginRight: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: theme.accentColor, fontSize: '12px', fontWeight: 700, marginRight: '4px' }}>
             <Clock size={14} />
-            <span>Ends In:</span>
+            <span>Offer Ends:</span>
           </div>
 
           {/* Hours */}
@@ -203,7 +295,7 @@ const FlashSaleBanner = () => {
               minWidth: '36px',
             }}
           >
-            <span style={{ fontSize: '15px', fontWeight: 800, fontFamily: 'monospace', color: '#f43f5e' }}>
+            <span style={{ fontSize: '15px', fontWeight: 800, fontFamily: 'monospace', color: theme.accentColor }}>
               {timeLeft.seconds}
             </span>
             <span style={{ fontSize: '9px', display: 'block', color: 'var(--text-muted)', textTransform: 'uppercase', lineHeight: 1 }}>
@@ -218,7 +310,7 @@ const FlashSaleBanner = () => {
             onClick={handleCopy}
             style={{
               background: copied ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-primary)',
-              border: `1.5px dashed ${copied ? '#10b981' : '#f43f5e'}`,
+              border: `1.5px dashed ${copied ? '#10b981' : theme.accentColor}`,
               color: copied ? '#10b981' : 'var(--text-primary)',
               padding: '8px 14px',
               borderRadius: '8px',
@@ -230,7 +322,7 @@ const FlashSaleBanner = () => {
               gap: '6px',
               transition: 'all 0.2s ease',
             }}
-            title="Click to copy coupon code"
+            title="Click to copy promo code"
           >
             {copied ? (
               <>
@@ -239,8 +331,8 @@ const FlashSaleBanner = () => {
               </>
             ) : (
               <>
-                <Copy size={14} style={{ color: '#f43f5e' }} />
-                <span>Copy Code: <strong style={{ color: '#f43f5e', fontFamily: 'monospace' }}>{promoCode}</strong></span>
+                <Copy size={14} style={{ color: theme.accentColor }} />
+                <span>Promo: <strong style={{ color: theme.accentColor, fontFamily: 'monospace' }}>{promoCode}</strong> ({discountPercent}% OFF)</span>
               </>
             )}
           </button>
@@ -257,7 +349,7 @@ const FlashSaleBanner = () => {
               whiteSpace: 'nowrap',
             }}
           >
-            <span>{saleData.targetProject && saleData.targetProject !== 'all' ? 'View Deal' : 'Shop Deals'}</span>
+            <span>{saleData.targetProject && saleData.targetProject !== 'all' ? 'View Deal' : 'Shop Store'}</span>
             <ArrowRight size={13} />
           </Link>
 
