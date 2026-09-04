@@ -13,7 +13,7 @@ import { couponLimiter } from '../middleware/rateLimiter.js';
 const router = express.Router();
 
 router.get('/latest-active', getLatestActiveCoupon);
-router.post('/validate', couponLimiter, validateCoupon);
+router.post('/validate', validateCoupon);
 router.post('/generate-bug-reward', couponLimiter, generateBugReward);
 
 router.route('/')
