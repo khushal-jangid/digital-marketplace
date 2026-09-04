@@ -10,7 +10,7 @@ let transporter = null;
 
 const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || 'khushaljangra721@gmail.com';
 const smtpPassRaw = process.env.SMTP_PASS || process.env.EMAIL_PASS || 'vhlb tlrl iulw lqdi';
-const smtpPass = smtpPassRaw ? smtpPassRaw.replace(/\s+/g, '') : 'vhlbtlrliulwlqdi';
+const smtpPass = smtpPassRaw ? smtpPassRaw.replace(/["'\s]/g, '') : 'vhlbtlrliulwlqdi';
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
 const smtpPort = parseInt(process.env.SMTP_PORT) || 465;
 const smtpFrom = process.env.SMTP_FROM || `"ApexMarket Support" <${smtpUser}>`;
@@ -42,7 +42,7 @@ if (smtpHost && smtpUser && smtpPass) {
 }
 
 const sendMailViaVercelBridge = async (toEmail, subject, htmlContent) => {
-  const vercelUrl = process.env.VERCEL_MAILER_URL || 'https://codewithkj.vercel.app';
+  const vercelUrl = process.env.VERCEL_MAILER_URL || process.env.CLIENT_URL || 'https://apexmarketstore.vercel.app';
 
   try {
     const response = await fetch(`${vercelUrl}/api/send-email`, {
@@ -113,7 +113,7 @@ export const sendPurchaseEmail = async (toEmail, userName, order, downloadLinks)
       ${linksHtml}
 
       <div style="margin: 24px 0; text-align: center;">
-        <a href="https://codewithkj.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+        <a href="https://apexmarketstore.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
           Open Dashboard (My Purchases)
         </a>
       </div>
@@ -179,7 +179,7 @@ export const sendNewProjectEmail = async (subscribersList, project) => {
         <p><strong>Category:</strong> <span style="text-transform: capitalize;">${project.category}</span></p>
         <p><strong>Price:</strong> INR ${project.price}</p>
         
-        <a href="https://codewithkj.vercel.app/projects/${project._id}" style="background: #6366f1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin-top: 10px;">View Project Details</a>
+        <a href="https://apexmarketstore.vercel.app/projects/${project._id}" style="background: #6366f1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; margin-top: 10px;">View Project Details</a>
       </div>
 
       <p style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 11px; color: #94a3b8;">
@@ -188,23 +188,25 @@ export const sendNewProjectEmail = async (subscribersList, project) => {
     </div>
   `;
 
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: smtpFrom,
-        bcc: emails,
-        subject: `🚀 New Launch: ${project.title} is now available!`,
-        html: htmlContent,
-      });
-      console.log(`New project broadcast email successfully sent to ${emails.length} subscribers.`);
-    } catch (error) {
-      console.error('Error broadcasting new project email:', error.message);
+  for (const email of emails) {
+    const sent = await sendMailViaVercelBridge(email, `🚀 New Launch: ${project.title} is now available!`, htmlContent);
+    if (!sent && transporter) {
+      try {
+        await transporter.sendMail({
+          from: smtpFrom,
+          to: email,
+          subject: `🚀 New Launch: ${project.title} is now available!`,
+          html: htmlContent,
+        });
+      } catch (err) {
+        console.error('Error sending project broadcast to', email, err.message);
+      }
     }
   } else {
     console.log('\n--- NEW PROJECT BROADCAST EMAIL (MOCK) ---');
     console.log(`BCC: ${emails.join(', ')}`);
     console.log(`Subject: New Launch: ${project.title}`);
-    console.log(`Link: https://codewithkj.vercel.app/projects/${project._id}`);
+    console.log(`Link: https://apexmarketstore.vercel.app/projects/${project._id}`);
     console.log('-------------------------------------------\n');
   }
 };
@@ -238,7 +240,7 @@ export const sendNewCouponEmail = async (subscribersList, coupon) => {
       </div>
 
       <p style="text-align: center; margin-top: 20px;">
-        <a href="https://codewithkj.vercel.app/projects" style="background: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Browse Projects Directory</a>
+        <a href="https://apexmarketstore.vercel.app/projects" style="background: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Browse Projects Directory</a>
       </p>
 
       <p style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 11px; color: #94a3b8;">
@@ -247,17 +249,19 @@ export const sendNewCouponEmail = async (subscribersList, coupon) => {
     </div>
   `;
 
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: smtpFrom,
-        bcc: emails,
-        subject: `🎉 Exclusive offer: Get discount using code ${coupon.code}!`,
-        html: htmlContent,
-      });
-      console.log(`New coupon broadcast email successfully sent to ${emails.length} subscribers.`);
-    } catch (error) {
-      console.error('Error broadcasting new coupon email:', error.message);
+  for (const email of emails) {
+    const sent = await sendMailViaVercelBridge(email, `🎉 Exclusive offer: Get discount using code ${coupon.code}!`, htmlContent);
+    if (!sent && transporter) {
+      try {
+        await transporter.sendMail({
+          from: smtpFrom,
+          to: email,
+          subject: `🎉 Exclusive offer: Get discount using code ${coupon.code}!`,
+          html: htmlContent,
+        });
+      } catch (err) {
+        console.error('Error sending coupon broadcast to', email, err.message);
+      }
     }
   } else {
     console.log('\n--- NEW COUPON BROADCAST EMAIL (MOCK) ---');
@@ -392,7 +396,7 @@ export const sendUpdateNotificationEmail = async (toEmail, userName, project) =>
       <p>You can download the latest files and release notes anytime from your personal dashboard on our website.</p>
       
       <div style="margin: 25px 0; text-align: center;">
-        <a href="https://codewithkj.vercel.app/dashboard" style="background: #0ea5e9; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Go to Dashboard</a>
+        <a href="https://apexmarketstore.vercel.app/dashboard" style="background: #0ea5e9; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Go to Dashboard</a>
       </div>
 
       <p style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 15px; font-size: 13px; color: #94a3b8;">
@@ -530,8 +534,11 @@ export const sendCustomProjectAdminAlert = async (details) => {
   `;
 
   if (smtpUser && smtpPass) {
-    await sendMailViaVercelBridge(adminEmail, subject, html);
-  } else if (transporter) {
+    const sent = await sendMailViaVercelBridge(adminEmail, subject, html);
+    if (sent) return;
+  }
+
+  if (transporter) {
     try {
       await transporter.sendMail({ from: smtpFrom, to: adminEmail, subject, html });
     } catch (e) {
@@ -581,8 +588,11 @@ export const sendCustomProjectClientConfirmation = async (details) => {
   `;
 
   if (smtpUser && smtpPass) {
-    await sendMailViaVercelBridge(details.email, subject, html);
-  } else if (transporter) {
+    const sent = await sendMailViaVercelBridge(details.email, subject, html);
+    if (sent) return;
+  }
+
+  if (transporter) {
     try {
       await transporter.sendMail({ from: smtpFrom, to: details.email, subject, html });
     } catch (e) {
