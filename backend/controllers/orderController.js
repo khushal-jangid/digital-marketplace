@@ -300,7 +300,7 @@ export const verifyUtrOrder = async (req, res) => {
     for (const item of order.items) {
       if (!item.project) continue;
       const proj = item.project;
-      const directUrl = proj.externalDownloadUrl || proj.fileUrl || item.externalDownloadUrl || item.fileUrl || 'https://codewithkj.vercel.app/dashboard';
+      const directUrl = proj.externalDownloadUrl || proj.fileUrl || item.externalDownloadUrl || item.fileUrl || 'https://apexmarketstore.vercel.app/dashboard';
 
       downloadLinks.push({
         title: proj.title || item.titleAtPurchase || 'Download Link',
