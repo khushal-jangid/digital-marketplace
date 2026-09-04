@@ -34,8 +34,8 @@ const MONGO_URI =
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_token_key_for_digital_marketplace_web_app_2026';
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8865031996:AAFF85bx08Vaf1fr3WbaGuGvx3rMv_Sij0g';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7370155608';
-const SMTP_USER = process.env.EMAIL_USER || 'khushaljangra721@gmail.com';
-const SMTP_PASS = (process.env.EMAIL_PASS || 'vhlb tlrl iulw lqdi').replace(/\s+/g, '');
+const SMTP_USER = process.env.EMAIL_USER || process.env.SMTP_USER || 'khushaljangra721@gmail.com';
+const SMTP_PASS = (process.env.EMAIL_PASS || process.env.SMTP_PASS || 'vhlb tlrl iulw lqdi').replace(/["'\s]/g, '');
 
 const KNOWN_JWT_SECRETS = [
   JWT_SECRET,
@@ -517,7 +517,7 @@ app.get('/api/projects/download-secure', async (req, res) => {
   try {
     const { token } = req.query;
     if (!token) {
-      return res.redirect('https://codewithkj.vercel.app/dashboard');
+      return res.redirect('https://apexmarketstore.vercel.app/dashboard');
     }
 
     let decoded = null;
@@ -536,9 +536,9 @@ app.get('/api/projects/download-secure', async (req, res) => {
       }
     }
 
-    return res.redirect('https://codewithkj.vercel.app/dashboard');
+    return res.redirect('https://apexmarketstore.vercel.app/dashboard');
   } catch (_) {
-    return res.redirect('https://codewithkj.vercel.app/dashboard');
+    return res.redirect('https://apexmarketstore.vercel.app/dashboard');
   }
 });
 
@@ -611,7 +611,7 @@ app.post('/api/orders', async (req, res) => {
           </div>
 
           <p style="color: #334155; font-size: 14px;">
-            Our team is verifying your payment with the bank. Once approved, you will receive another email with your download links and the project will unlock on your <a href="https://codewithkj.vercel.app/dashboard">Dashboard</a>.
+            Our team is verifying your payment with the bank. Once approved, you will receive another email with your download links and the project will unlock on your <a href="https://apexmarketstore.vercel.app/dashboard">Dashboard</a>.
           </p>
 
           <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px;">
@@ -698,7 +698,7 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
         </div>
 
         <p style="color: #334155; font-size: 14px;">
-          Our team is verifying your payment with the bank. Once approved, you will receive another email with your download links and the project will unlock on your <a href="https://codewithkj.vercel.app/dashboard">Dashboard</a>.
+          Our team is verifying your payment with the bank. Once approved, you will receive another email with your download links and the project will unlock on your <a href="https://apexmarketstore.vercel.app/dashboard">Dashboard</a>.
         </p>
 
         <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px;">
@@ -725,7 +725,7 @@ app.put('/api/orders/:id/status', authenticate, requireAdmin, async (req, res) =
     const order = await Order.findByIdAndUpdate(req.params.id, { paymentStatus }, { new: true }).populate('projects');
     if (paymentStatus === 'paid' && order?.userEmail) {
       const itemsListHtml = (order.projects || []).map((p) => {
-        const directUrl = p.externalDownloadUrl || p.fileUrl || 'https://codewithkj.vercel.app/dashboard';
+        const directUrl = p.externalDownloadUrl || p.fileUrl || 'https://apexmarketstore.vercel.app/dashboard';
         return `
           <div style="margin: 12px 0; padding: 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px;">
             <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: bold; color: #1e293b;">📦 ${p.title} (₹${p.price})</p>
@@ -753,7 +753,7 @@ app.put('/api/orders/:id/status', authenticate, requireAdmin, async (req, res) =
           ${itemsListHtml || '<p>Access all your projects directly in your dashboard.</p>'}
 
           <p style="margin: 24px 0; text-align: center;">
-            <a href="https://codewithkj.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
+            <a href="https://apexmarketstore.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
               Open Dashboard (My Purchases)
             </a>
           </p>
@@ -783,7 +783,7 @@ app.post('/api/orders/verify-utr/:id', authenticate, requireAdmin, async (req, r
     const targetEmail = order.userEmail || order.contactEmail;
     if (targetEmail) {
       const itemsListHtml = (order.projects || []).map((p) => {
-        const directUrl = p.externalDownloadUrl || p.fileUrl || 'https://codewithkj.vercel.app/dashboard';
+        const directUrl = p.externalDownloadUrl || p.fileUrl || 'https://apexmarketstore.vercel.app/dashboard';
         return `
           <div style="margin: 12px 0; padding: 14px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px;">
             <p style="margin: 0 0 6px 0; font-size: 15px; font-weight: bold; color: #1e293b;">📦 ${p.title} (₹${p.price})</p>
@@ -812,7 +812,7 @@ app.post('/api/orders/verify-utr/:id', authenticate, requireAdmin, async (req, r
           ${itemsListHtml || '<p>Access all your projects directly in your dashboard.</p>'}
 
           <p style="margin: 24px 0; text-align: center;">
-            <a href="https://codewithkj.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
+            <a href="https://apexmarketstore.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
               Open Dashboard (My Purchases)
             </a>
           </p>
@@ -1612,7 +1612,7 @@ app.post('/api/support', async (req, res) => {
 
     if (!isAdmin) {
       sendTelegramAlert(
-        `💬 <b>NEW LIVE CHAT MESSAGE!</b>\n\n👤 <b>Customer:</b> ${senderName} (${senderEmail})\n📝 <b>Message:</b> ${message.trim()}\n\n👉 <i>Reply live at: https://codewithkj.vercel.app/support</i>`
+        `💬 <b>NEW LIVE CHAT MESSAGE!</b>\n\n👤 <b>Customer:</b> ${senderName} (${senderEmail})\n📝 <b>Message:</b> ${message.trim()}\n\n👉 <i>Reply live at: https://apexmarketstore.vercel.app/support</i>`
       );
     }
 
