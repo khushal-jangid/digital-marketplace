@@ -29,6 +29,7 @@ router.post('/telegram-webhook', telegramWebhook);
 router.post('/verify-utr/:id', protect, admin, verifyUtrOrder);
 router.post('/reject-utr/:id', protect, admin, rejectUtrOrder);
 router.post('/refund/:id', protect, admin, refundOrder);
+router.get('/my-orders', protect, getMyPurchasedProjects);
 router.get('/my-purchases', protect, getMyPurchasedProjects);
 router.get('/download-history', protect, getDownloadHistory);
 router.get('/:id', protect, getOrderById);
