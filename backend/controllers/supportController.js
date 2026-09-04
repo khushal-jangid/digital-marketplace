@@ -374,7 +374,7 @@ export const sendDirectEmail = async (req, res) => {
 
     // 1. Try sending via Vercel mail bridge first (guaranteed 100% delivery without Render port throttling)
     try {
-      const vercelRes = await fetch('https://codewithkj.vercel.app/api/send-email', {
+      const vercelRes = await fetch((process.env.VERCEL_MAILER_URL || process.env.CLIENT_URL || 'https://apexmarketstore.vercel.app') + '/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -396,7 +396,7 @@ export const sendDirectEmail = async (req, res) => {
       const vData = await vercelRes.json();
       if (vData.success) {
         if (senderEmail && senderEmail.includes('@')) {
-          await fetch('https://codewithkj.vercel.app/api/send-email', {
+          await fetch((process.env.VERCEL_MAILER_URL || process.env.CLIENT_URL || 'https://apexmarketstore.vercel.app') + '/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -429,7 +429,7 @@ export const sendDirectEmail = async (req, res) => {
     // 2. Direct SMTP fallback
     const nodemailer = (await import('nodemailer')).default;
     const activeUser = process.env.SMTP_USER || process.env.EMAIL_USER || 'khushaljangra721@gmail.com';
-    const activePass = (process.env.SMTP_PASS || process.env.EMAIL_PASS || 'vhlb tlrl iulw lqdi').replace(/\s+/g, '');
+    const activePass = (process.env.SMTP_PASS || process.env.EMAIL_PASS || 'vhlb tlrl iulw lqdi').replace(/["'\s]/g, '');
 
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
