@@ -39,6 +39,16 @@ const flashSaleSchema = new mongoose.Schema(
       type: String,
       default: 'All Projects',
     },
+    badge: {
+      type: String,
+      default: '⚡ FLASH DEAL',
+      trim: true,
+    },
+    festivalTheme: {
+      type: String,
+      default: 'flash', // 'diwali', 'holi', 'republic_day', 'independence_day', 'new_year', 'eid', 'flash', 'custom'
+      trim: true,
+    },
   },
   {
     timestamps: true,
