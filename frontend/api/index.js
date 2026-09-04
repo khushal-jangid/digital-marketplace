@@ -1000,49 +1000,153 @@ app.post('/api/coupons/validate', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Coupon code is required' });
     }
     const cleanCode = code.trim().toUpperCase();
-    const subtotal = Number(cartAmount) || 0;
 
-    // 1. Check active Flash Sale code first
-    const flashSale = await FlashSale.findOne({ isActive: true });
-    if (flashSale && flashSale.promoCode && flashSale.promoCode.trim().toUpperCase() === cleanCode) {
-      if (flashSale.endTime && new Date() > new Date(flashSale.endTime)) {
-        return res.status(400).json({ success: false, message: 'Flash Sale promo code has expired' });
-      }
+    // Accurately compute cart subtotal
+    let subtotal = Number(req.body.subtotal || cartAmount) || 0;
+    if (subtotal <= 0 && Array.isArray(cartItems) && cartItems.length > 0) {
+      subtotal = cartItems.reduce((acc, item) => {
+        const base = Number(item.price || item.priceAtPurchase || 0);
+        return acc + (item.licenseType === 'commercial' ? Math.round(base * 2.2) : base);
+      }, 0);
+    }
 
-      let discount = 0;
-      if (flashSale.targetProject && flashSale.targetProject !== 'all') {
-        const matchingItem = (cartItems || []).find((item) => (item._id || item.id) === flashSale.targetProject);
-        if (!matchingItem) {
-          return res.status(400).json({
-            success: false,
-            message: `This flash deal applies only to "${flashSale.targetProjectTitle || 'selected project'}".`,
-          });
+    // 1. Check Active Flash Sale / Festival Sale from DB
+    try {
+      const flashSale = await FlashSale.findOne({
+        $or: [
+          { promoCode: cleanCode },
+          { isActive: true },
+        ],
+      }).sort({ createdAt: -1 });
+
+      if (flashSale && flashSale.promoCode && flashSale.promoCode.trim().toUpperCase() === cleanCode) {
+        if (!flashSale.isActive) {
+          return res.status(400).json({ success: false, message: 'This festival / flash deal is currently paused.' });
         }
-        const itemPrice = Number(matchingItem.price) || 0;
-        discount = Math.round((itemPrice * (flashSale.discountPercentage || 0)) / 100);
-      } else {
-        discount = Math.round((subtotal * (flashSale.discountPercentage || 0)) / 100);
-      }
+        if (flashSale.endTime && new Date() > new Date(flashSale.endTime)) {
+          return res.status(400).json({ success: false, message: 'Festival / Flash Sale promo code has expired' });
+        }
 
+        let discount = 0;
+        if (flashSale.targetProject && flashSale.targetProject.toString() !== 'all') {
+          const targetStr = flashSale.targetProject.toString();
+          const matchingItem = (cartItems || []).find((item) => {
+            const itemId = (item._id || item.id || item.project?._id || item.project || '').toString();
+            return itemId === targetStr;
+          });
+
+          if (!matchingItem) {
+            return res.status(400).json({
+              success: false,
+              message: `This flash deal applies only to "${flashSale.targetProjectTitle || 'selected project'}".`,
+            });
+          }
+          const itemPrice = Number(matchingItem.price) || 0;
+          discount = Math.round((itemPrice * (flashSale.discountPercentage || 0)) / 100);
+        } else {
+          // Storewide discount on ALL projects
+          discount = Math.round((subtotal * (flashSale.discountPercentage || 0)) / 100);
+        }
+
+        discount = Math.max(0, Math.min(discount, subtotal));
+        const finalTotal = Math.max(0, subtotal - discount);
+
+        // Auto-upsert into Coupon collection so standard checks also succeed
+        try {
+          await Coupon.findOneAndUpdate(
+            { code: cleanCode },
+            {
+              $set: {
+                code: cleanCode,
+                discountType: 'percentage',
+                discountValue: flashSale.discountPercentage || 35,
+                minOrderAmount: 0,
+                maxDiscount: null,
+                expiryDate: flashSale.endTime || new Date(Date.now() + 24 * 60 * 60 * 1000),
+                startDate: new Date(),
+                isActive: true,
+                targetProject: flashSale.targetProject && flashSale.targetProject.toString() !== 'all' ? flashSale.targetProject : null,
+                targetProjectTitle: flashSale.targetProjectTitle || 'All Projects',
+              },
+            },
+            { upsert: true, new: true }
+          );
+        } catch (_) {}
+
+        return res.json({
+          success: true,
+          coupon: {
+            code: flashSale.promoCode,
+            discountType: 'percentage',
+            discountValue: flashSale.discountPercentage,
+            targetProject: flashSale.targetProject,
+            targetProjectTitle: flashSale.targetProjectTitle || 'All Projects',
+          },
+          discount,
+          subtotal,
+          finalTotal,
+          message: `🎉 ${flashSale.badge || 'Offer'} Applied! Flat ${flashSale.discountPercentage}% OFF (Saved ₹${discount})`,
+        });
+      }
+    } catch (e) {
+      console.warn('FlashSale lookup error:', e.message);
+    }
+
+    // 1.5 Built-in Default Flash & Festival Presets Fallback
+    const KNOWN_PRESETS = {
+      FLASH35: { discount: 35, title: '⚡ Flash Deal 35% OFF' },
+      DIWALI40: { discount: 40, title: '🪔 Diwali Dhamaka 40% OFF' },
+      HOLI35: { discount: 35, title: '🎨 Holi Dhamaka 35% OFF' },
+      REPUBLIC50: { discount: 50, title: '🇮🇳 Republic Day 50% OFF' },
+      FREEDOM45: { discount: 45, title: '🇮🇳 Freedom Offer 45% OFF' },
+      NEWYEAR45: { discount: 45, title: '🎆 New Year 45% OFF' },
+      EID35: { discount: 35, title: '🌙 Eid Special 35% OFF' },
+    };
+
+    if (KNOWN_PRESETS[cleanCode]) {
+      const preset = KNOWN_PRESETS[cleanCode];
+      const discount = Math.max(0, Math.min(Math.round((subtotal * preset.discount) / 100), subtotal));
       const finalTotal = Math.max(0, subtotal - discount);
+
+      // Persist in Coupon collection
+      try {
+        await Coupon.findOneAndUpdate(
+          { code: cleanCode },
+          {
+            $set: {
+              code: cleanCode,
+              discountType: 'percentage',
+              discountValue: preset.discount,
+              minOrderAmount: 0,
+              maxDiscount: null,
+              expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              startDate: new Date(),
+              isActive: true,
+              targetProject: null,
+              targetProjectTitle: 'All Projects',
+            },
+          },
+          { upsert: true, new: true }
+        );
+      } catch (_) {}
 
       return res.json({
         success: true,
         coupon: {
-          code: flashSale.promoCode,
+          code: cleanCode,
           discountType: 'percentage',
-          discountValue: flashSale.discountPercentage,
-          targetProject: flashSale.targetProject,
-          targetProjectTitle: flashSale.targetProjectTitle,
+          discountValue: preset.discount,
+          targetProject: null,
+          targetProjectTitle: 'All Projects',
         },
         discount,
         subtotal,
         finalTotal,
-        message: `🎉 Flash Sale Applied! Flat ${flashSale.discountPercentage}% OFF (Saved ₹${discount})`,
+        message: `🎉 ${preset.title} Applied! Flat ${preset.discount}% OFF (Saved ₹${discount})`,
       });
     }
 
-    // 2. Check Standard Coupons
+    // 2. Check Standard Coupons in Database
     const coupon = await Coupon.findOne({ code: cleanCode, isActive: true });
     if (!coupon) {
       return res.status(404).json({ success: false, message: 'Invalid or inactive coupon code' });
@@ -1058,15 +1162,34 @@ app.post('/api/coupons/validate', async (req, res) => {
     }
 
     let discount = 0;
-    if (coupon.discountType === 'percentage') {
-      discount = Math.round((subtotal * (coupon.discountValue || 0)) / 100);
-      if (coupon.maxDiscount && discount > coupon.maxDiscount) {
-        discount = coupon.maxDiscount;
+    if (coupon.targetProject && coupon.targetProject.toString() !== 'all') {
+      const targetStr = coupon.targetProject.toString();
+      const matchingItem = (cartItems || []).find((item) => {
+        const itemId = (item._id || item.id || item.project?._id || item.project || '').toString();
+        return itemId === targetStr;
+      });
+
+      if (!matchingItem) {
+        return res.status(400).json({
+          success: false,
+          message: `This coupon is valid only for "${coupon.targetProjectTitle || 'selected project'}".`,
+        });
       }
+      const itemPrice = Number(matchingItem.price) || 0;
+      discount = coupon.discountType === 'percentage'
+        ? Math.round((itemPrice * coupon.discountValue) / 100)
+        : Math.min(itemPrice, coupon.discountValue);
     } else {
-      discount = Math.min(subtotal, Number(coupon.discountValue) || 0);
+      discount = coupon.discountType === 'percentage'
+        ? Math.round((subtotal * coupon.discountValue) / 100)
+        : Math.min(subtotal, coupon.discountValue);
     }
 
+    if (coupon.maxDiscount && discount > coupon.maxDiscount) {
+      discount = coupon.maxDiscount;
+    }
+
+    discount = Math.max(0, Math.min(discount, subtotal));
     const finalTotal = Math.max(0, subtotal - discount);
 
     res.json({
@@ -1081,48 +1204,7 @@ app.post('/api/coupons/validate', async (req, res) => {
       discount,
       subtotal,
       finalTotal,
-      message: `🎉 Coupon "${coupon.code}" Applied! Saved ₹${discount}`,
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-app.post('/api/coupons/apply', async (req, res) => {
-  try {
-    const { code } = req.body;
-    if (!code) return res.status(400).json({ success: false, message: 'Promo code required' });
-    const cleanCode = code.trim().toUpperCase();
-
-    // 1. Check active Flash Sale code first
-    const flashSale = await FlashSale.findOne({ isActive: true });
-    if (flashSale && flashSale.promoCode && flashSale.promoCode.trim().toUpperCase() === cleanCode) {
-      if (flashSale.endTime && new Date() > new Date(flashSale.endTime)) {
-        return res.status(400).json({ success: false, message: 'Flash Sale promo code has expired' });
-      }
-      return res.json({
-        success: true,
-        message: `Flash Sale discount applied: ${flashSale.discountPercentage}% OFF!`,
-        coupon: {
-          code: flashSale.promoCode,
-          discountType: 'percentage',
-          discountValue: flashSale.discountPercentage,
-          targetProject: flashSale.targetProject,
-          targetProjectTitle: flashSale.targetProjectTitle,
-        },
-      });
-    }
-
-    // 2. Standard Coupon check
-    const coupon = await Coupon.findOne({ code: cleanCode, isActive: true });
-    if (!coupon) return res.status(404).json({ success: false, message: 'Invalid or inactive coupon code' });
-    if (coupon.expiryDate && new Date() > new Date(coupon.expiryDate)) {
-      return res.status(400).json({ success: false, message: 'Coupon has expired' });
-    }
-    res.json({
-      success: true,
-      message: `Coupon applied: ${coupon.discountValue}${coupon.discountType === 'percentage' ? '%' : ' INR'} OFF!`,
-      coupon,
+      message: `Coupon applied! Saved ₹${discount}`,
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1160,7 +1242,19 @@ app.get('/api/flash-sale', async (req, res) => {
     if (!flashSale || !flashSale.title) {
       return res.json({
         success: true,
-        flashSale: { isActive: false, title: '', subtitle: '', promoCode: '', discountPercentage: 0, endTime: null, isExpired: true, targetProject: null, targetProjectTitle: 'All Projects' },
+        flashSale: {
+          isActive: true,
+          title: '⚡ Lightning Flash Sale — Flat 35% OFF on All Projects!',
+          subtitle: 'Use coupon code at checkout for instant discount across the entire catalog.',
+          promoCode: 'FLASH35',
+          discountPercentage: 35,
+          endTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          isExpired: false,
+          targetProject: null,
+          targetProjectTitle: 'All Projects',
+          badge: '⚡ FLASH DEAL',
+          festivalTheme: 'flash',
+        },
       });
     }
     const isExpired = !flashSale.isActive || (flashSale.endTime && new Date() > new Date(flashSale.endTime));
@@ -1171,11 +1265,13 @@ app.get('/api/flash-sale', async (req, res) => {
         isActive: Boolean(flashSale.isActive),
         title: flashSale.title,
         subtitle: flashSale.subtitle || '',
-        promoCode: flashSale.promoCode || '',
-        discountPercentage: flashSale.discountPercentage || 0,
+        promoCode: flashSale.promoCode || 'FLASH35',
+        discountPercentage: flashSale.discountPercentage || 35,
         endTime: flashSale.endTime,
         targetProject: flashSale.targetProject || null,
         targetProjectTitle: flashSale.targetProjectTitle || 'All Projects',
+        badge: flashSale.badge || '⚡ FLASH DEAL',
+        festivalTheme: flashSale.festivalTheme || 'flash',
         isExpired,
       },
     });
@@ -1186,25 +1282,59 @@ app.get('/api/flash-sale', async (req, res) => {
 
 app.put('/api/flash-sale', authenticate, requireAdmin, async (req, res) => {
   try {
-    const { isActive, title, subtitle, promoCode, discountPercentage, endTime, targetProject, targetProjectTitle } = req.body;
+    const { isActive, title, subtitle, promoCode, discountPercentage, endTime, targetProject, targetProjectTitle, badge, festivalTheme } = req.body;
     const formattedCode = promoCode ? promoCode.trim().toUpperCase() : 'FLASH35';
     const isSaleActive = Boolean(isActive);
+    const discountVal = Number(discountPercentage) || 0;
+    const parsedEndTime = endTime ? new Date(endTime) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const parsedTargetProject = targetProject && targetProject !== 'all' ? targetProject : null;
+    const parsedTargetTitle = targetProjectTitle || (parsedTargetProject ? 'Selected Project' : 'All Projects');
 
     let flashSale = await FlashSale.findOne();
     if (!flashSale) flashSale = new FlashSale();
+
+    const oldPromoCode = flashSale.promoCode;
 
     flashSale.isActive = isSaleActive;
     if (title !== undefined) flashSale.title = title;
     if (subtitle !== undefined) flashSale.subtitle = subtitle;
     flashSale.promoCode = formattedCode;
-    flashSale.discountPercentage = Number(discountPercentage) || 0;
-    flashSale.endTime = endTime ? new Date(endTime) : null;
-    flashSale.targetProject = targetProject && targetProject !== 'all' ? targetProject : null;
-    flashSale.targetProjectTitle = targetProjectTitle || 'All Projects';
+    flashSale.discountPercentage = discountVal;
+    flashSale.endTime = parsedEndTime;
+    flashSale.targetProject = parsedTargetProject;
+    flashSale.targetProjectTitle = parsedTargetTitle;
+    flashSale.badge = badge ? badge.trim() : '⚡ FLASH DEAL';
+    flashSale.festivalTheme = festivalTheme ? festivalTheme.trim() : 'flash';
 
     await flashSale.save();
 
-    res.json({ success: true, message: `Flash Sale updated (${isSaleActive ? 'LIVE' : 'PAUSED'})!`, flashSale });
+    // Auto-sync into Coupon collection so checkout validates it for all projects!
+    if (formattedCode && discountVal > 0) {
+      if (oldPromoCode && oldPromoCode !== formattedCode) {
+        await Coupon.findOneAndUpdate({ code: oldPromoCode }, { isActive: false }).catch(() => {});
+      }
+      await Coupon.findOneAndUpdate(
+        { code: formattedCode },
+        {
+          $set: {
+            code: formattedCode,
+            discountType: 'percentage',
+            discountValue: discountVal,
+            minOrderAmount: 0,
+            maxDiscount: null,
+            expiryDate: parsedEndTime,
+            startDate: new Date(),
+            usageLimit: null,
+            isActive: isSaleActive,
+            targetProject: parsedTargetProject,
+            targetProjectTitle: parsedTargetTitle,
+          },
+        },
+        { upsert: true, new: true }
+      ).catch(() => {});
+    }
+
+    res.json({ success: true, message: `Festival / Flash Sale updated (${isSaleActive ? 'LIVE' : 'PAUSED'}) and synced to all projects!`, flashSale });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -1212,6 +1342,10 @@ app.put('/api/flash-sale', authenticate, requireAdmin, async (req, res) => {
 
 app.delete('/api/flash-sale', authenticate, requireAdmin, async (req, res) => {
   try {
+    const flashSale = await FlashSale.findOne();
+    if (flashSale && flashSale.promoCode) {
+      await Coupon.deleteOne({ code: flashSale.promoCode }).catch(() => {});
+    }
     await FlashSale.deleteMany({});
     res.json({ success: true, message: 'Flash Sale deleted permanently!' });
   } catch (err) {
