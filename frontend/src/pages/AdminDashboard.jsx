@@ -22,6 +22,9 @@ import {
   Flame,
   Clock,
   Zap,
+  Sparkles,
+  Gift,
+  Tag,
   FileText,
   Mail,
   Send,
@@ -37,6 +40,87 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import InvoiceModal from '../components/InvoiceModal';
+
+
+const FESTIVAL_PRESETS = [
+  {
+    id: 'diwali',
+    label: '🪔 Diwali Sale',
+    badge: '🪔 DIWALI DHAMAKA',
+    title: '🪔 Diwali Grand Festival Sale — Flat 40% OFF on All Projects!',
+    subtitle: 'Celebrate Diwali with instant festive discount across our entire developer catalog!',
+    promoCode: 'DIWALI40',
+    discountPercentage: 40,
+    hours: 168, // 7 days
+    theme: 'diwali',
+  },
+  {
+    id: 'holi',
+    label: '🎨 Holi Dhamaka',
+    badge: '🎨 HOLI SPECIAL',
+    title: '🎨 Holi Colors of Code Sale — Flat 35% OFF on All Projects!',
+    subtitle: 'Add colors to your development stack! Use promo code at checkout.',
+    promoCode: 'HOLI35',
+    discountPercentage: 35,
+    hours: 72, // 3 days
+    theme: 'holi',
+  },
+  {
+    id: 'republic_day',
+    label: '🇮🇳 Republic Day',
+    badge: '🇮🇳 REPUBLIC DAY',
+    title: '🇮🇳 Republic Day Mega Sale — Flat 50% OFF Storewide!',
+    subtitle: 'Honor the day with mega discounts on all source codes and developer templates.',
+    promoCode: 'REPUBLIC50',
+    discountPercentage: 50,
+    hours: 72, // 3 days
+    theme: 'republic_day',
+  },
+  {
+    id: 'independence_day',
+    label: '🇮🇳 Freedom Sale',
+    badge: '🇮🇳 FREEDOM SALE',
+    title: '🇮🇳 Independence Day Freedom Offer — Flat 45% OFF Storewide!',
+    subtitle: 'Celebrate freedom to build! Instant discount on all digital developer assets.',
+    promoCode: 'FREEDOM45',
+    discountPercentage: 45,
+    hours: 96, // 4 days
+    theme: 'republic_day',
+  },
+  {
+    id: 'new_year',
+    label: '🎆 New Year',
+    badge: '🎆 NEW YEAR 2027',
+    title: '🎆 New Year Mega Kickoff — Flat 45% OFF on All Projects!',
+    subtitle: 'Kickstart your projects this year with our battle-tested boilerplates.',
+    promoCode: 'NEWYEAR45',
+    discountPercentage: 45,
+    hours: 120, // 5 days
+    theme: 'new_year',
+  },
+  {
+    id: 'eid',
+    label: '🌙 Eid Special',
+    badge: '🌙 EID MUBARAK',
+    title: '🌙 Eid Mubarak Festive Sale — Flat 35% OFF on All Projects!',
+    subtitle: 'Celebrate the festive season with special discounts across the entire store.',
+    promoCode: 'EID35',
+    discountPercentage: 35,
+    hours: 72, // 3 days
+    theme: 'diwali',
+  },
+  {
+    id: 'flash',
+    label: '⚡ 24h Flash Deal',
+    badge: '⚡ FLASH DEAL',
+    title: '⚡ Lightning Flash Sale — Flat 35% OFF on All Projects!',
+    subtitle: 'Hurry up! Special limited-time flash promo code valid for the next 24 hours.',
+    promoCode: 'FLASH35',
+    discountPercentage: 35,
+    hours: 24,
+    theme: 'flash',
+  },
+];
 
 const AdminDashboard = () => {
   const { logout } = useAuth();
@@ -109,7 +193,7 @@ const AdminDashboard = () => {
   // Reviews State
   const [allReviews, setAllReviews] = useState([]);
   const [allReviewsLoading, setAllReviewsLoading] = useState(false);
-  // Flash Sale State
+  // Festival & Flash Sale State
   const [flashSaleConfig, setFlashSaleConfig] = useState({
     isActive: false,
     title: '',
@@ -119,7 +203,25 @@ const AdminDashboard = () => {
     endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
     targetProject: null,
     targetProjectTitle: 'All Projects',
+    badge: '⚡ FLASH DEAL',
+    festivalTheme: 'flash',
   });
+
+  const applyFestivalPreset = (preset) => {
+    const end = new Date(Date.now() + preset.hours * 60 * 60 * 1000);
+    setFlashSaleConfig({
+      isActive: true,
+      title: preset.title,
+      subtitle: preset.subtitle,
+      promoCode: preset.promoCode,
+      discountPercentage: preset.discountPercentage,
+      endTime: end.toISOString().slice(0, 16),
+      targetProject: null, // Global storewide discount for all projects!
+      targetProjectTitle: 'All Projects',
+      badge: preset.badge,
+      festivalTheme: preset.theme,
+    });
+  };
   const [flashSaleLoading, setFlashSaleLoading] = useState(false);
   const [flashSaleMsg, setFlashSaleMsg] = useState('');
   const [flashSaleError, setFlashSaleError] = useState('');
@@ -152,6 +254,8 @@ const AdminDashboard = () => {
             : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
           targetProject: fs.targetProject || null,
           targetProjectTitle: fs.targetProjectTitle || 'All Projects',
+          badge: fs.badge || '⚡ FLASH DEAL',
+          festivalTheme: fs.festivalTheme || 'flash',
         });
       }
     } catch (err) {
@@ -916,7 +1020,7 @@ const AdminDashboard = () => {
           { id: 'orders', label: 'Orders & UTR', icon: <ShoppingCart size={15} /> },
           { id: 'products', label: 'Products Catalog', icon: <FolderOpen size={15} /> },
           { id: 'coupons', label: 'Discount Coupons', icon: <Ticket size={15} /> },
-          { id: 'flashSale', label: 'Flash Sale ⚡', icon: <Flame size={15} style={{ color: '#f43f5e' }} /> },
+          { id: 'flashSale', label: 'Festival & Flash Sale 🪔⚡', icon: <Sparkles size={15} style={{ color: '#f59e0b' }} /> },
           { id: 'reviews', label: 'Customer Reviews', icon: <Star size={15} /> },
         ].map((tab) => (
           <button
@@ -1519,15 +1623,15 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Flash Sale & Promo Manager Tab */}
+      {/* Flash Sale & Festival Sale Manager Tab */}
       {activeTab === 'flashSale' && (
         <div className="responsive-admin-grid" style={{ alignItems: 'flex-start' }}>
           
-          {/* Flash Sale Configuration Form */}
+          {/* Flash & Festival Sale Configuration Form */}
           <div className="glass-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '14px', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
               <h3 style={{ fontSize: '17px', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Flame size={20} style={{ color: '#f43f5e' }} /> Flash Sale & Deal of the Day Controls
+                <Sparkles size={20} style={{ color: '#f59e0b' }} /> Festival Dhamaka & Flash Sale Command Center
               </h3>
               
               {/* Toggle Switch */}
@@ -1549,9 +1653,53 @@ const AdminDashboard = () => {
                   transition: 'all 0.2s ease',
                 }}
               >
-                <span>●</span>
-                <span>{flashSaleConfig.isActive ? 'Flash Sale LIVE' : 'Flash Sale OFF'}</span>
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: flashSaleConfig.isActive ? '#10b981' : '#f87171',
+                    boxShadow: flashSaleConfig.isActive ? '0 0 8px #10b981' : 'none',
+                  }}
+                />
+                <span>{flashSaleConfig.isActive ? 'Festival / Sale LIVE' : 'Sale OFF (Paused)'}</span>
               </button>
+            </div>
+
+            {/* Quick 1-Click Festival Presets */}
+            <div style={{ marginBottom: '20px', padding: '14px', background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                <Gift size={15} style={{ color: '#f59e0b' }} />
+                <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  1-Click Festival Quick-Launch Presets:
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {FESTIVAL_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyFestivalPreset(preset)}
+                    style={{
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      background: flashSaleConfig.badge === preset.badge ? 'rgba(245, 158, 11, 0.25)' : 'var(--bg-primary)',
+                      border: `1px solid ${flashSaleConfig.badge === preset.badge ? '#f59e0b' : 'var(--border)'}`,
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      color: flashSaleConfig.badge === preset.badge ? '#f59e0b' : 'var(--text-primary)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <span>{preset.label}</span>
+                    <span style={{ fontSize: '10.5px', opacity: 0.75 }}>({preset.discountPercentage}%)</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {flashSaleMsg && (
@@ -1567,9 +1715,45 @@ const AdminDashboard = () => {
             )}
 
             <form onSubmit={handleFlashSaleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              
+              {/* Festival Theme Style & Event Badge */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                    🎨 Festival Color Theme *
+                  </label>
+                  <select
+                    className="form-input"
+                    value={flashSaleConfig.festivalTheme || 'flash'}
+                    onChange={(e) => setFlashSaleConfig({ ...flashSaleConfig, festivalTheme: e.target.value })}
+                  >
+                    <option value="diwali">🪔 Diwali (Gold & Amber Festive Glow)</option>
+                    <option value="holi">🎨 Holi (Vibrant Pink, Violet & Cyan)</option>
+                    <option value="republic_day">🇮🇳 Republic / Independence Day (Tricolor)</option>
+                    <option value="new_year">🎆 New Year (Celebratory Violet & Gold)</option>
+                    <option value="flash">⚡ Classic Flash Deal (Neon Flame)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                    🏷️ Event Badge / Tag *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input"
+                    placeholder="e.g., 🪔 DIWALI SPECIAL or 🇮🇳 REPUBLIC DAY"
+                    value={flashSaleConfig.badge || ''}
+                    onChange={(e) => setFlashSaleConfig({ ...flashSaleConfig, badge: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Target Project (Discount Scope) */}
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
-                  🎯 Target Project for Flash Deal *
+                  🎯 Discount Scope (All Projects or Specific) *
                 </label>
                 <select
                   className="form-input"
@@ -1581,7 +1765,6 @@ const AdminDashboard = () => {
                         ...flashSaleConfig,
                         targetProject: null,
                         targetProjectTitle: 'All Projects',
-                        title: `Get Flat ${flashSaleConfig.discountPercentage || 35}% OFF on all Full-Stack & Developer Templates!`,
                       });
                     } else {
                       const selected = projects.find((p) => p._id === val);
@@ -1589,18 +1772,20 @@ const AdminDashboard = () => {
                         ...flashSaleConfig,
                         targetProject: val,
                         targetProjectTitle: selected?.title || 'Selected Project',
-                        title: selected ? `Deal of the Day: Flat ${flashSaleConfig.discountPercentage || 35}% OFF on ${selected.title}!` : flashSaleConfig.title,
                       });
                     }
                   }}
                 >
-                  <option value="all">🌟 All Projects (Storewide Global Deal)</option>
+                  <option value="all">🌟 All Projects (Storewide Festival Discount — Works on Everything!)</option>
                   {projects.map((p) => (
                     <option key={p._id} value={p._id}>
                       📦 Only on: {p.title} (INR {p.price})
                     </option>
                   ))}
                 </select>
+                <span style={{ fontSize: '11.5px', color: '#10b981', marginTop: '4px', display: 'block' }}>
+                  ✓ &quot;All Projects&quot; select karne par yeh promo code sabhi developer templates aur projects par apply hoga!
+                </span>
               </div>
 
               <div>
@@ -1611,7 +1796,7 @@ const AdminDashboard = () => {
                   type="text"
                   required
                   className="form-input"
-                  placeholder="E.g., Get Flat 35% OFF on all Full-Stack & Developer Templates!"
+                  placeholder="e.g., 🪔 Diwali Grand Festival Sale — Flat 40% OFF on All Projects!"
                   value={flashSaleConfig.title}
                   onChange={(e) => setFlashSaleConfig({ ...flashSaleConfig, title: e.target.value })}
                 />
@@ -1619,7 +1804,7 @@ const AdminDashboard = () => {
 
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
-                  Banner Subtitle / Instructions
+                  Banner Subtitle / Festive Note
                 </label>
                 <input
                   type="text"
@@ -1640,10 +1825,13 @@ const AdminDashboard = () => {
                     required
                     style={{ textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 700 }}
                     className="form-input"
-                    placeholder="FLASH35"
+                    placeholder="DIWALI40"
                     value={flashSaleConfig.promoCode}
                     onChange={(e) => setFlashSaleConfig({ ...flashSaleConfig, promoCode: e.target.value.toUpperCase() })}
                   />
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'block' }}>
+                    Yeh code automatically store ke coupon checkout system me activate ho jayega.
+                  </span>
                 </div>
 
                 <div>
@@ -1656,7 +1844,7 @@ const AdminDashboard = () => {
                     min="1"
                     max="100"
                     className="form-input"
-                    placeholder="35"
+                    placeholder="40"
                     value={flashSaleConfig.discountPercentage}
                     onChange={(e) => setFlashSaleConfig({ ...flashSaleConfig, discountPercentage: Number(e.target.value) })}
                   />
@@ -1666,7 +1854,7 @@ const AdminDashboard = () => {
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                   <label style={{ fontSize: '12.5px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                    Sale Expiration Date & Time *
+                    Festival Offer End Date & Time *
                   </label>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button
@@ -1716,31 +1904,26 @@ const AdminDashboard = () => {
                   className="btn btn-primary"
                   style={{ padding: '14px', flex: 1, fontSize: '14px', fontWeight: 700 }}
                 >
-                  {flashSaleLoading ? 'Saving Settings...' : '⚡ Save & Broadcast Live'}
+                  {flashSaleLoading ? 'Saving & Broadcasting...' : '⚡ Save & Broadcast Live to All Projects'}
                 </button>
-
                 <button
                   type="button"
                   onClick={handleDeleteFlashSale}
                   disabled={flashSaleLoading}
                   style={{
-                    padding: '14px 20px',
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    border: '1px solid #f87171',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
                     color: '#f87171',
                     borderRadius: '8px',
+                    padding: '0 16px',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease',
+                    justifyContent: 'center',
                   }}
-                  title="Permanently remove flash sale and deactivate promo coupon"
+                  title="Permanently remove sale and deactivate promo coupon"
                 >
                   <Trash2 size={16} />
-                  <span>Delete</span>
                 </button>
               </div>
             </form>
@@ -1749,8 +1932,8 @@ const AdminDashboard = () => {
           {/* Right Live Preview Box */}
           <div className="glass-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', margin: 0 }}>
-                👁️ Visitor Live Banner Preview
+              <h3 style={{ fontSize: '16px', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Sparkles size={16} style={{ color: '#f59e0b' }} /> Visitor Live Banner Preview
               </h3>
               {flashSaleConfig.promoCode && (
                 <button
@@ -1770,7 +1953,7 @@ const AdminDashboard = () => {
                     alignItems: 'center',
                     gap: '4px',
                   }}
-                  title="Delete this Flash Deal immediately"
+                  title="Delete this Festival / Flash Deal immediately"
                 >
                   <Trash2 size={13} />
                   <span>Delete Deal</span>
@@ -1779,29 +1962,57 @@ const AdminDashboard = () => {
             </div>
             
             <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              This is how the Flash Deal countdown banner will appear on the Homepage and Projects catalog:
+              This is how the banner will look to customers on the Homepage and Projects catalog:
             </p>
 
             {flashSaleConfig.promoCode ? (
               <div
                 style={{
-                  background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.18) 0%, rgba(244, 63, 94, 0.15) 50%, rgba(245, 158, 11, 0.15) 100%)',
-                  border: '1px solid rgba(244, 63, 94, 0.35)',
+                  background:
+                    flashSaleConfig.festivalTheme === 'diwali'
+                      ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(217, 119, 6, 0.18) 50%, rgba(220, 38, 38, 0.16) 100%)'
+                      : flashSaleConfig.festivalTheme === 'holi'
+                      ? 'linear-gradient(135deg, rgba(236, 72, 153, 0.22) 0%, rgba(139, 92, 246, 0.2) 50%, rgba(6, 182, 212, 0.18) 100%)'
+                      : flashSaleConfig.festivalTheme === 'republic_day' || flashSaleConfig.festivalTheme === 'independence_day'
+                      ? 'linear-gradient(135deg, rgba(249, 115, 22, 0.22) 0%, rgba(255, 255, 255, 0.08) 50%, rgba(16, 185, 129, 0.2) 100%)'
+                      : flashSaleConfig.festivalTheme === 'new_year'
+                      ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.22) 0%, rgba(236, 72, 153, 0.18) 50%, rgba(234, 179, 8, 0.18) 100%)'
+                      : 'linear-gradient(135deg, rgba(79, 70, 229, 0.18) 0%, rgba(244, 63, 94, 0.15) 50%, rgba(245, 158, 11, 0.15) 100%)',
+                  border:
+                    flashSaleConfig.festivalTheme === 'diwali'
+                      ? '1px solid rgba(245, 158, 11, 0.45)'
+                      : flashSaleConfig.festivalTheme === 'holi'
+                      ? '1px solid rgba(236, 72, 153, 0.45)'
+                      : flashSaleConfig.festivalTheme === 'republic_day' || flashSaleConfig.festivalTheme === 'independence_day'
+                      ? '1px solid rgba(249, 115, 22, 0.45)'
+                      : flashSaleConfig.festivalTheme === 'new_year'
+                      ? '1px solid rgba(168, 85, 247, 0.45)'
+                      : '1px solid rgba(244, 63, 94, 0.35)',
                   borderRadius: '16px',
                   padding: '20px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '14px',
                   position: 'relative',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.2)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div
                       style={{
-                        background: 'linear-gradient(135deg, #f43f5e 0%, #ea580c 100%)',
+                        background:
+                          flashSaleConfig.festivalTheme === 'diwali'
+                            ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                            : flashSaleConfig.festivalTheme === 'holi'
+                            ? 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #06b6d4 100%)'
+                            : flashSaleConfig.festivalTheme === 'republic_day' || flashSaleConfig.festivalTheme === 'independence_day'
+                            ? 'linear-gradient(135deg, #f97316 0%, #0284c7 50%, #10b981 100%)'
+                            : flashSaleConfig.festivalTheme === 'new_year'
+                            ? 'linear-gradient(135deg, #a855f7 0%, #eab308 100%)'
+                            : 'linear-gradient(135deg, #f43f5e 0%, #ea580c 100%)',
                         color: '#ffffff',
-                        padding: '4px 10px',
+                        padding: '4px 12px',
                         borderRadius: '6px',
                         fontSize: '11px',
                         fontWeight: 800,
@@ -1810,15 +2021,14 @@ const AdminDashboard = () => {
                         gap: '4px',
                       }}
                     >
-                      <Flame size={13} />
-                      <span>FLASH DEAL</span>
+                      <span>{flashSaleConfig.badge || '⚡ FLASH DEAL'}</span>
                     </div>
                     <span style={{ fontSize: '11.5px', color: flashSaleConfig.isActive ? '#10b981' : '#f87171', fontWeight: 700 }}>
                       {flashSaleConfig.isActive ? '● Live on Store' : '● Inactive (Hidden)'}
                     </span>
                   </div>
 
-                  {/* Direct 1-Click Delete Icon in Card */}
+                  {/* 1-Click Delete Button in Card */}
                   <button
                     type="button"
                     onClick={handleDeleteFlashSale}
@@ -1835,37 +2045,45 @@ const AdminDashboard = () => {
                       alignItems: 'center',
                       gap: '4px',
                     }}
-                    title="Delete this Flash Deal"
+                    title="Delete this Deal"
                   >
                     <Trash2 size={13} /> Delete
                   </button>
                 </div>
 
                 <div>
-                  {flashSaleConfig.targetProjectTitle && flashSaleConfig.targetProjectTitle !== 'All Projects' && (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', padding: '3px 8px', borderRadius: '6px', fontWeight: 700, marginBottom: '6px' }}>
-                      <span>🎯 Targeted Item: {flashSaleConfig.targetProjectTitle}</span>
-                    </div>
-                  )}
+                  <div style={{ marginBottom: '6px' }}>
+                    {!flashSaleConfig.targetProject || flashSaleConfig.targetProject === 'all' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                        <Tag size={11} />
+                        <span>🌟 Storewide: Valid on ALL Projects!</span>
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>
+                        <span>🎯 Targeted Item: {flashSaleConfig.targetProjectTitle}</span>
+                      </span>
+                    )}
+                  </div>
+                  
                   <h4 style={{ fontSize: '15px', color: 'var(--text-primary)', margin: '0 0 4px 0', fontWeight: 700 }}>
-                    {flashSaleConfig.title || 'Get Flat 35% OFF on all Full-Stack & Developer Templates!'}
+                    {flashSaleConfig.title || 'Special Festival Offer: Flat Discount Storewide!'}
                   </h4>
                   <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
                     {flashSaleConfig.subtitle || 'Use coupon code at checkout for instant discount across the entire catalog.'}
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingTop: '10px', borderTop: '1px solid rgba(244, 63, 94, 0.2)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-primary)', padding: '6px 10px', borderRadius: '6px', border: '1px dashed #f43f5e' }}>
-                    <span style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#f43f5e' }}>
-                      {flashSaleConfig.promoCode}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg-primary)', padding: '6px 10px', borderRadius: '6px', border: '1px dashed var(--border)' }}>
+                    <span style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Code: {flashSaleConfig.promoCode}
                     </span>
-                    <span style={{ fontSize: '10px', background: 'rgba(244, 63, 94, 0.15)', color: '#f43f5e', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
-                      {flashSaleConfig.discountPercentage || 35}% OFF
+                    <span style={{ fontSize: '10px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+                      {flashSaleConfig.discountPercentage || 40}% OFF
                     </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#f43f5e', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px', color: '#f59e0b', fontWeight: 700 }}>
                     <Clock size={13} />
                     <span>{getRemainingTime(flashSaleConfig.endTime).text}</span>
                   </div>
@@ -1881,25 +2099,26 @@ const AdminDashboard = () => {
                 }}
               >
                 <p style={{ color: 'var(--text-secondary)', fontSize: '13.5px', marginBottom: '14px' }}>
-                  No active Flash Deal banner configured right now.
+                  No active Festival / Flash Deal banner configured right now.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFlashSaleConfig({
-                      isActive: true,
-                      title: 'Get Flat 35% OFF on all Full-Stack & Developer Templates!',
-                      subtitle: 'Use coupon code at checkout for instant discount across the entire catalog.',
-                      promoCode: 'FLASH35',
-                      discountPercentage: 35,
-                      endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
-                    });
-                  }}
-                  className="btn btn-secondary"
-                  style={{ fontSize: '12.5px', padding: '8px 16px' }}
-                >
-                  ⚡ Populate New 35% Flash Deal Template
-                </button>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => applyFestivalPreset(FESTIVAL_PRESETS[0])}
+                    className="btn btn-primary"
+                    style={{ fontSize: '12.5px', padding: '8px 16px' }}
+                  >
+                    🪔 Launch Diwali Sale
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyFestivalPreset(FESTIVAL_PRESETS[2])}
+                    className="btn btn-secondary"
+                    style={{ fontSize: '12.5px', padding: '8px 16px' }}
+                  >
+                    🇮🇳 Launch Republic Day Sale
+                  </button>
+                </div>
               </div>
             )}
           </div>
