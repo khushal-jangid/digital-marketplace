@@ -1,7 +1,7 @@
 import FlashSale from '../models/FlashSale.js';
 import Coupon from '../models/Coupon.js';
 import Settings from '../models/Settings.js';
-import mockDb, { isDbConnected } from '../config/mockDb.js';
+import { isDbConnected, mockDb } from '../config/mockDb.js';
 
 /**
  * @desc    Get active Festival / Flash Sale settings & countdown end time
