@@ -385,7 +385,7 @@ export const downloadProjectSecure = async (req, res) => {
   try {
     const { token } = req.query;
     if (!token) {
-      return res.redirect('https://codewithkj.vercel.app/dashboard');
+      return res.redirect('https://apexmarketstore.vercel.app/dashboard');
     }
 
     let decoded = null;
@@ -415,9 +415,9 @@ export const downloadProjectSecure = async (req, res) => {
       } catch (_) {}
     }
 
-    return res.redirect('https://codewithkj.vercel.app/dashboard');
+    return res.redirect('https://apexmarketstore.vercel.app/dashboard');
   } catch (error) {
-    return res.redirect('https://codewithkj.vercel.app/dashboard');
+    return res.redirect('https://apexmarketstore.vercel.app/dashboard');
   }
 };
 
