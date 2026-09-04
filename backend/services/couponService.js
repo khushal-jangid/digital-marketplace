@@ -1,5 +1,16 @@
 import Coupon from '../models/Coupon.js';
+import FlashSale from '../models/FlashSale.js';
 import { isDbConnected, mockDb } from '../config/mockDb.js';
+
+const KNOWN_PRESETS = {
+  FLASH35: { discount: 35, title: 'Flash Deal 35% OFF' },
+  DIWALI40: { discount: 40, title: 'Diwali Dhamaka 40% OFF' },
+  HOLI35: { discount: 35, title: 'Holi Dhamaka 35% OFF' },
+  REPUBLIC50: { discount: 50, title: 'Republic Day 50% OFF' },
+  FREEDOM45: { discount: 45, title: 'Freedom Offer 45% OFF' },
+  NEWYEAR45: { discount: 45, title: 'New Year 45% OFF' },
+  EID35: { discount: 35, title: 'Eid Special 35% OFF' },
+};
 
 /**
  * Normalize coupon code (trim and uppercase)
@@ -88,7 +99,6 @@ export const calculateDiscount = (coupon, eligibleSubtotal, totalSubtotal) => {
     }
   } else if (coupon.discountType === 'fixed') {
     const fixedVal = Math.max(0, Number(coupon.discountValue) || 0);
-    // Fixed discount cannot exceed eligible subtotal or total subtotal
     discount = Math.min(fixedVal, eligible);
   }
 
@@ -122,10 +132,102 @@ export const validateCoupon = async ({ code, cartItems = [], subtotal = null }) 
 
   let coupon = null;
 
+  // 1. Check Coupon Model in DB or Mock
   if (!isDbConnected()) {
     coupon = mockDb.coupons.find((c) => c.code === cleanCode);
   } else {
     coupon = await Coupon.findOne({ code: cleanCode });
+  }
+
+  // 2. Check Active Flash Sale / Festival Sale
+  if (!coupon) {
+    try {
+      if (isDbConnected()) {
+        const flashSale = await FlashSale.findOne({
+          promoCode: cleanCode,
+          isActive: true,
+        });
+
+        if (flashSale) {
+          coupon = {
+            code: cleanCode,
+            discountType: 'percentage',
+            discountValue: flashSale.discountPercentage || 35,
+            minOrderAmount: 0,
+            maxDiscount: null,
+            expiryDate: flashSale.endTime || new Date(Date.now() + 24 * 60 * 60 * 1000),
+            startDate: new Date(),
+            usageLimit: null,
+            usedCount: 0,
+            isActive: Boolean(flashSale.isActive),
+            targetProject: flashSale.targetProject,
+            targetProjectTitle: flashSale.targetProjectTitle || 'All Projects',
+          };
+
+          // Auto-sync into Coupon collection so it exists permanently
+          Coupon.findOneAndUpdate(
+            { code: cleanCode },
+            { $set: coupon },
+            { upsert: true, new: true }
+          ).catch(() => {});
+        } else {
+          // Check latest active flash sale even if code casing is different
+          const latestSale = await FlashSale.findOne().sort({ createdAt: -1 });
+          if (latestSale && latestSale.isActive && normalizeCouponCode(latestSale.promoCode) === cleanCode) {
+            coupon = {
+              code: cleanCode,
+              discountType: 'percentage',
+              discountValue: latestSale.discountPercentage || 35,
+              minOrderAmount: 0,
+              maxDiscount: null,
+              expiryDate: latestSale.endTime || new Date(Date.now() + 24 * 60 * 60 * 1000),
+              startDate: new Date(),
+              usageLimit: null,
+              usedCount: 0,
+              isActive: Boolean(latestSale.isActive),
+              targetProject: latestSale.targetProject,
+              targetProjectTitle: latestSale.targetProjectTitle || 'All Projects',
+            };
+          }
+        }
+      } else {
+        if (mockDb.flashSale && normalizeCouponCode(mockDb.flashSale.promoCode) === cleanCode) {
+          coupon = {
+            code: cleanCode,
+            discountType: 'percentage',
+            discountValue: mockDb.flashSale.discountPercentage || 35,
+            minOrderAmount: 0,
+            maxDiscount: null,
+            expiryDate: mockDb.flashSale.endTime || new Date(Date.now() + 24 * 60 * 60 * 1000),
+            startDate: new Date(),
+            usageLimit: null,
+            usedCount: 0,
+            isActive: mockDb.flashSale.isActive,
+            targetProject: mockDb.flashSale.targetProject,
+            targetProjectTitle: mockDb.flashSale.targetProjectTitle || 'All Projects',
+          };
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 3. Check Known Festival / Flash Presets Fallback
+  if (!coupon && KNOWN_PRESETS[cleanCode]) {
+    const preset = KNOWN_PRESETS[cleanCode];
+    coupon = {
+      code: cleanCode,
+      discountType: 'percentage',
+      discountValue: preset.discount,
+      minOrderAmount: 0,
+      maxDiscount: null,
+      expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      startDate: new Date(),
+      usageLimit: null,
+      usedCount: 0,
+      isActive: true,
+      targetProject: null,
+      targetProjectTitle: 'All Projects',
+    };
   }
 
   if (!coupon) {
@@ -177,7 +279,7 @@ export const validateCoupon = async ({ code, cartItems = [], subtotal = null }) 
 
   // Calculate actual subtotal from cart items if provided
   let computedSubtotal = subtotal;
-  if (computedSubtotal === null || computedSubtotal === undefined) {
+  if (computedSubtotal === null || computedSubtotal === undefined || computedSubtotal <= 0) {
     computedSubtotal = cartItems.reduce((acc, item) => {
       const base = Number(item.price || item.priceAtPurchase || 0);
       return acc + (item.licenseType === 'commercial' ? Math.round(base * 2.2) : base);
@@ -228,7 +330,7 @@ export const validateCoupon = async ({ code, cartItems = [], subtotal = null }) 
     finalTotal,
     message: coupon.targetProjectTitle && coupon.targetProjectTitle !== 'All Projects'
       ? `Coupon "${coupon.code}" applied for ${coupon.targetProjectTitle}!`
-      : `Coupon "${coupon.code}" applied successfully!`,
+      : `Coupon "${coupon.code}" applied successfully! (${coupon.discountValue}% OFF)`,
   };
 };
 
