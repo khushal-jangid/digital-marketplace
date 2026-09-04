@@ -99,3 +99,5 @@ export const mockDb = {
   downloads: [],
   featureRequests: [],
 };
+
+export default mockDb;
