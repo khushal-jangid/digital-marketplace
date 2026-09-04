@@ -35,8 +35,8 @@ export const createRateLimiter = ({
   const store = rateLimitStores.get(keyPrefix);
 
   return (req, res, next) => {
-    // In test environment, skip rate limiting
-    if (process.env.NODE_ENV === 'test') {
+    // In test or non-production development environments, skip rate limiting
+    if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') {
       return next();
     }
 
@@ -44,6 +44,16 @@ export const createRateLimiter = ({
       (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown')
         .split(',')[0]
         .trim();
+
+    // Do not rate limit localhost or loopback during local testing
+    if (
+      clientIp === '127.0.0.1' ||
+      clientIp === '::1' ||
+      clientIp === 'unknown' ||
+      clientIp.includes('127.0.0.1')
+    ) {
+      return next();
+    }
 
     const now = Date.now();
     let record = store.get(clientIp);
@@ -76,28 +86,28 @@ export const createRateLimiter = ({
 
 export const authLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 20, // 20 attempts per 15 minutes
+  max: 30, // 30 attempts per 15 minutes
   message: 'Too many authentication attempts. Please try again after 15 minutes.',
   keyPrefix: 'auth',
 });
 
 export const couponLimiter = createRateLimiter({
-  windowMs: 10 * 60 * 1000,
-  max: 40, // 40 coupon validation requests per 10 minutes
-  message: 'Too many coupon validation requests. Please wait a few minutes before trying again.',
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 500, // Generous 500 requests per minute
+  message: 'Too many coupon validation requests. Please wait a few seconds before trying again.',
   keyPrefix: 'coupon',
 });
 
 export const checkoutLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 30, // 30 checkouts / payment verification requests per 15 minutes
+  max: 60, // 60 checkouts / payment verification requests per 15 minutes
   message: 'Too many checkout requests. Please try again shortly.',
   keyPrefix: 'checkout',
 });
 
 export const downloadLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 40, // 40 download link requests per 15 minutes
+  max: 60, // 60 download link requests per 15 minutes
   message: 'Download request limit reached. Please wait before requesting another download link.',
   keyPrefix: 'download',
 });
