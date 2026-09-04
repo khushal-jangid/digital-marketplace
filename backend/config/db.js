@@ -11,13 +11,9 @@ if (dns && dns.setServers) {
 }
 
 const connectDB = async () => {
-  const mongoUri = process.env.MONGO_URI;
-
-  if (!mongoUri) {
-    console.error('FATAL: MONGO_URI environment variable is missing.');
-    console.error('Set MONGO_URI in backend/.env to your real MongoDB Atlas (or local) connection string.');
-    process.exit(1);
-  }
+  const mongoUri =
+    process.env.MONGO_URI ||
+    'mongodb+srv://khushaljangra013_db_user:KJIGJtITbR4L8Yvi@cluster0.ywucg6a.mongodb.net/digital_marketplace?retryWrites=true&w=majority&appName=Cluster0';
 
   try {
     const conn = await mongoose.connect(mongoUri, {
