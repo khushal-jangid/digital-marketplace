@@ -165,6 +165,24 @@ const ProjectCard = ({ project }) => {
           >
             ✓ PURCHASED
           </span>
+        ) : Number(project.price) === 0 ? (
+          <span
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: '#ffffff',
+              fontSize: '10.5px',
+              fontWeight: '800',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              letterSpacing: '0.04em',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.5)',
+            }}
+          >
+            🎁 FREE
+          </span>
         ) : isFeatured ? (
           <span
             style={{
@@ -258,13 +276,21 @@ const ProjectCard = ({ project }) => {
         >
           <div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '17px', fontWeight: '600', color: 'var(--primary)' }}>
-                {formatPrice ? formatPrice(project.price) : `₹${project.price}`}
-              </span>
-              {project.originalPrice > project.price && (
-                <span style={{ fontSize: '12px', textDecoration: 'line-through', color: 'var(--text-muted)' }}>
-                  {formatPrice ? formatPrice(project.originalPrice) : `₹${project.originalPrice}`}
+              {Number(project.price) === 0 ? (
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '17px', fontWeight: '800', color: '#10b981' }}>
+                  FREE
                 </span>
+              ) : (
+                <>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '17px', fontWeight: '600', color: 'var(--primary)' }}>
+                    {formatPrice ? formatPrice(project.price) : `₹${project.price}`}
+                  </span>
+                  {project.originalPrice > project.price && (
+                    <span style={{ fontSize: '12px', textDecoration: 'line-through', color: 'var(--text-muted)' }}>
+                      {formatPrice ? formatPrice(project.originalPrice) : `₹${project.originalPrice}`}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -289,6 +315,28 @@ const ProjectCard = ({ project }) => {
             >
               <Check size={14} strokeWidth={2.5} />
               <span>Purchased</span>
+            </Link>
+          ) : Number(project.price) === 0 ? (
+            <Link
+              to={`/projects/${project._id}`}
+              style={{
+                padding: '7px 13px',
+                fontSize: '12px',
+                fontWeight: '700',
+                borderRadius: 'var(--radius-sm)',
+                gap: '4px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: '#ffffff',
+                border: 'none',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.35)',
+              }}
+            >
+              <span>Get Free</span>
+              <ArrowUpRight size={13} />
             </Link>
           ) : (
             <button
