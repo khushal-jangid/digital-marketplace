@@ -206,6 +206,19 @@ export const createQrOrder = async (req, res) => {
       }
     }
 
+    // Setup Assistance Add-on Calculation
+    let setupAssistanceFee = 0;
+    const isSetupRequested = Boolean(includeSetupAssistance === true || includeSetupAssistance === 'true');
+    if (isSetupRequested) {
+      try {
+        const settingDoc = await Settings.findOne({ key: 'setup_assistance_price' });
+        setupAssistanceFee = settingDoc && !isNaN(Number(settingDoc.value)) ? Number(settingDoc.value) : 199;
+      } catch (_) {
+        setupAssistanceFee = 199;
+      }
+      totalAmount += setupAssistanceFee;
+    }
+
     // 4. Create Order in MongoDB
     const order = await Order.create({
       user: userId,
@@ -219,6 +232,8 @@ export const createQrOrder = async (req, res) => {
       contactEmail: cleanEmail,
       contactPhone: cleanPhone,
       referredByCode: referredByCode ? referredByCode.trim().toUpperCase() : null,
+      includeSetupAssistance: isSetupRequested,
+      setupAssistancePrice: setupAssistanceFee,
     });
 
     console.log(`[Order Submitted] ID: ${order._id}, Total: ₹${totalAmount}, UTR: ${cleanUtr}, Email: ${cleanEmail}`);
