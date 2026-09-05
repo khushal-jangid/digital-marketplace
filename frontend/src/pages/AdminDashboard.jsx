@@ -711,6 +711,12 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
+    if (activeTab === 'settings') {
+      fetchStoreSettings();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
     // Check URL parameters for direct tab navigation & Telegram 1-click approvals
     try {
       const params = new URLSearchParams(window.location.search);
@@ -758,6 +764,7 @@ const AdminDashboard = () => {
     fetchDashboardStats();
     fetchProjects();
     fetchCoupons();
+    fetchStoreSettings();
     fetchFlashSaleConfig();
     fetchOrders();
     fetchCustomProjects();
