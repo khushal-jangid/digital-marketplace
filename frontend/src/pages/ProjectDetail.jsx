@@ -53,6 +53,60 @@ const ProjectDetail = () => {
   // Active Image Preview Index
   const [activeImgIndex, setActiveImgIndex] = useState(0);
 
+  // Free Lead Magnet Download Modal State
+  const [showFreeModal, setShowFreeModal] = useState(false);
+  const [freeName, setFreeName] = useState('');
+  const [freeEmail, setFreeEmail] = useState('');
+  const [freePhone, setFreePhone] = useState('');
+  const [freeLoading, setFreeLoading] = useState(false);
+  const [freeError, setFreeError] = useState('');
+  const [freeSuccess, setFreeSuccess] = useState(false);
+  const [unlockedDownloadUrl, setUnlockedDownloadUrl] = useState('');
+
+  useEffect(() => {
+    if (user?.name && !freeName) setFreeName(user.name);
+    if (user?.email && !freeEmail) setFreeEmail(user.email);
+  }, [user]);
+
+  const handleFreeDownloadSubmit = async (e) => {
+    e.preventDefault();
+    setFreeError('');
+
+    if (!freeEmail || !freeEmail.includes('@')) {
+      setFreeError('Please enter a valid email address.');
+      return;
+    }
+    if (!freePhone || freePhone.trim().length < 10) {
+      setFreeError('Please enter a valid 10-digit WhatsApp number.');
+      return;
+    }
+
+    setFreeLoading(true);
+    try {
+      const res = await request('/orders/free-download', 'POST', {
+        projectId: id,
+        name: freeName.trim(),
+        email: freeEmail.trim(),
+        phone: freePhone.trim(),
+      });
+
+      if (res?.success) {
+        setUnlockedDownloadUrl(res.downloadUrl);
+        setFreeSuccess(true);
+        if (res.token) {
+          localStorage.setItem('token', res.token);
+          if (loadProfile) await loadProfile();
+        }
+      } else {
+        setFreeError(res?.message || 'Failed to generate free download.');
+      }
+    } catch (err) {
+      setFreeError(err.message || 'Error occurred while requesting free download.');
+    } finally {
+      setFreeLoading(false);
+    }
+  };
+
   const fetchProjectDetails = async () => {
     try {
       // 1. Fetch project data
@@ -490,30 +544,45 @@ const ProjectDetail = () => {
             {/* Dynamic Price Display */}
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  {formatPrice(project.price)}
-                </span>
-                {(() => {
-                  const baseMrp = project.originalPrice && project.originalPrice > project.price
-                    ? project.originalPrice
-                    : Math.round(project.price * 1.5);
-                  const currentPrice = project.price;
-                  const discountPercent = Math.round(((baseMrp - currentPrice) / baseMrp) * 100);
-                  if (discountPercent <= 0) return null;
-                  return (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '17px', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
-                        {formatPrice(baseMrp)}
-                      </span>
-                      <span style={{ fontSize: '12px', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
-                        {discountPercent}% OFF
-                      </span>
-                    </div>
-                  );
-                })()}
+                {Number(project.price) === 0 ? (
+                  <>
+                    <span style={{ fontSize: '34px', fontWeight: 800, color: '#10b981' }}>
+                      FREE
+                    </span>
+                    <span style={{ fontSize: '12px', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '3px 10px', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                      🎁 100% FREE ACCESS
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                      {formatPrice(project.price)}
+                    </span>
+                    {(() => {
+                      const baseMrp = project.originalPrice && project.originalPrice > project.price
+                        ? project.originalPrice
+                        : Math.round(project.price * 1.5);
+                      const currentPrice = project.price;
+                      const discountPercent = Math.round(((baseMrp - currentPrice) / baseMrp) * 100);
+                      if (discountPercent <= 0) return null;
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '17px', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                            {formatPrice(baseMrp)}
+                          </span>
+                          <span style={{ fontSize: '12px', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
+                            {discountPercent}% OFF
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </>
+                )}
               </div>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                One-time payment • Lifetime access & future updates
+                {Number(project.price) === 0
+                  ? 'Free Starter Project • Instant access with Email & WhatsApp'
+                  : 'One-time payment • Lifetime access & future updates'}
               </span>
             </div>
 
@@ -546,6 +615,11 @@ const ProjectDetail = () => {
                     Single end product, student learning, personal portfolio.
                   </p>
                 </div>
+                {Number(project.price) > 0 && (
+                  <div style={{ marginTop: '10px', padding: '10px 12px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '6px', border: '1px dashed var(--primary)', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    🛠️ <strong>Need remote installation?</strong> 1-on-1 Setup Assistance (AnyDesk / Google Meet) is available at checkout!
+                  </div>
+                )}
               </div>
             </div>
 
@@ -614,6 +688,34 @@ const ProjectDetail = () => {
                   View in My Purchases / Dashboard
                 </Link>
               </div>
+            ) : Number(project.price) === 0 ? (
+              <button
+                onClick={() => {
+                  setFreeSuccess(false);
+                  setFreeError('');
+                  setShowFreeModal(true);
+                }}
+                className="btn"
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  marginTop: '10px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                  cursor: 'pointer',
+                }}
+              >
+                <Download size={18} /> ⚡ Get Free Instant Download
+              </button>
             ) : (
               <button
                 onClick={handleAddToCart}
@@ -628,6 +730,224 @@ const ProjectDetail = () => {
         </div>
 
       </div>
+
+
+      {/* Free Lead Magnet Download Modal */}
+      {showFreeModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div className="glass-card animate-fade-in" style={{
+            maxWidth: '440px',
+            width: '100%',
+            borderRadius: '16px',
+            padding: '28px',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-hover)',
+            boxShadow: 'var(--shadow-lg)',
+            position: 'relative'
+          }}>
+            {/* Close Button */}
+            <button
+              onClick={() => setShowFreeModal(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border)',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              ✕
+            </button>
+
+            {!freeSuccess ? (
+              <div>
+                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                  <div style={{
+                    width: '54px',
+                    height: '54px',
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    color: '#10b981',
+                    borderRadius: '50%',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '12px'
+                  }}>
+                    <Download size={26} />
+                  </div>
+                  <h3 style={{ fontSize: '20px', color: 'var(--text-primary)', marginBottom: '6px' }}>
+                    Get Free Instant Download
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                    Enter your details to unlock instant download & future updates for <strong>{project.title}</strong>
+                  </p>
+                </div>
+
+                {freeError && (
+                  <div style={{
+                    background: 'rgba(239, 68, 68, 0.12)',
+                    color: '#ef4444',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    marginBottom: '16px',
+                    border: '1px solid rgba(239, 68, 68, 0.3)'
+                  }}>
+                    {freeError}
+                  </div>
+                )}
+
+                <form onSubmit={handleFreeDownloadSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '5px' }}>
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Rahul Sharma"
+                      className="form-input"
+                      value={freeName}
+                      onChange={(e) => setFreeName(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '5px' }}>
+                      Email Address (Link will be sent here) *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="rahul@gmail.com"
+                      className="form-input"
+                      value={freeEmail}
+                      onChange={(e) => setFreeEmail(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '5px' }}>
+                      WhatsApp Number (For Developer Updates) *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. 9876543210"
+                      className="form-input"
+                      value={freePhone}
+                      onChange={(e) => setFreePhone(e.target.value)}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={freeLoading}
+                    className="btn"
+                    style={{
+                      width: '100%',
+                      padding: '13px',
+                      marginTop: '8px',
+                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: '14.5px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: freeLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <Download size={18} /> {freeLoading ? 'Unlocking Download...' : 'Download Free Source Code'}
+                  </button>
+
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', margin: '4px 0 0 0' }}>
+                    🔒 Zero spam guarantee. No credit card or payment required.
+                  </p>
+                </form>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <div style={{
+                  width: '60px',
+                  height: '60px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#10b981',
+                  borderRadius: '50%',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '16px'
+                }}>
+                  <CheckCircle size={32} />
+                </div>
+                <h3 style={{ fontSize: '20px', color: 'var(--text-primary)', marginBottom: '8px' }}>
+                  Download Unlocked! 🎉
+                </h3>
+                <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginBottom: '24px' }}>
+                  Your free project source code is ready. We've also dispatched a confirmation copy to <strong>{freeEmail}</strong>.
+                </p>
+
+                <a
+                  href={unlockedDownloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    width: '100%',
+                    padding: '14px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '15px',
+                    borderRadius: '8px',
+                    textDecoration: 'none',
+                    marginBottom: '12px'
+                  }}
+                >
+                  <Download size={18} /> ⬇️ Download Source Code ZIP
+                </a>
+
+                <button
+                  onClick={() => setShowFreeModal(false)}
+                  className="btn btn-secondary"
+                  style={{ width: '100%', padding: '10px', fontSize: '13px' }}
+                >
+                  Done / Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );
