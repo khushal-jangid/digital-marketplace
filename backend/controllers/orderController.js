@@ -9,6 +9,7 @@ import { sendPurchaseEmail, sendRejectionEmail, sendRecoveryEmail, sendOrderPend
 import { sendTelegramMessage, answerCallbackQuery, editTelegramMessage } from '../config/telegram.js';
 import { signJwt, verifyJwt } from '../config/jwt.js';
 import couponService from '../services/couponService.js';
+import Settings from '../models/Settings.js';
 
 /**
  * Check whether a user already owns any of the projects
@@ -77,6 +78,7 @@ export const createQrOrder = async (req, res) => {
       contactEmail,
       contactPhone,
       referredByCode,
+      includeSetupAssistance,
     } = req.body;
 
     const cleanUtr = (transactionRef || '').trim();
@@ -616,4 +618,154 @@ export default {
   sendRecoveryEmails,
   telegramWebhook,
   handleTelegramCallback,
+};
+
+
+/**
+ * Handle 1-Click Free Lead Magnet Download
+ * Captures user Name, Email, and WhatsApp Phone number, creates free order,
+ * sends download mail and Telegram alert to owner, and returns instant download link.
+ */
+export const freeDownloadOrder = async (req, res) => {
+  try {
+    const { projectId, name, email, phone } = req.body;
+
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanName = (name || '').trim() || cleanEmail.split('@')[0];
+    const cleanPhone = (phone || '').trim();
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address for receiving your download link.',
+      });
+    }
+
+    if (!cleanPhone || cleanPhone.length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 10-digit WhatsApp number for verification and developer updates.',
+      });
+    }
+
+    if (!projectId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Project ID is required.',
+      });
+    }
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found.',
+      });
+    }
+
+    // Verify it is free (price 0)
+    if (Number(project.price) > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'This is a premium project. Please add it to your cart to purchase.',
+      });
+    }
+
+    // 1. Find or create user
+    let user = await User.findOne({ email: cleanEmail });
+    let autoToken = null;
+    if (!user) {
+      const generatedPassword = Math.random().toString(36).substring(2, 10) + 'A1!';
+      user = await User.create({
+        name: cleanName,
+        email: cleanEmail,
+        password: generatedPassword,
+        role: 'user',
+        referralCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+      });
+    }
+    autoToken = signJwt({ id: user._id }, { expiresIn: '30d' });
+
+    // 2. Create paid Order for 0 INR
+    const order = await Order.create({
+      user: user._id,
+      items: [
+        {
+          project: project._id,
+          titleAtPurchase: project.title,
+          priceAtPurchase: 0,
+        },
+      ],
+      totalAmount: 0,
+      discountAmount: 0,
+      paymentStatus: 'paid',
+      paymentMethod: 'free',
+      contactEmail: cleanEmail,
+      contactPhone: cleanPhone,
+    });
+
+    // 3. Increment download count
+    project.downloadCount = (project.downloadCount || 0) + 1;
+    await project.save();
+
+    // 4. Save Lead in AbandonedLead collection
+    try {
+      await AbandonedLead.create({
+        email: cleanEmail,
+        phone: cleanPhone,
+        items: [{ project: project._id, title: project.title, price: 0 }],
+        totalAmount: 0,
+        tag: 'free_lead_magnet',
+      });
+    } catch (_) {}
+
+    // 5. Telegram Notification to Admin
+    const cleanPhoneDigits = cleanPhone.replace(/\D/g, '');
+    const tgText = `🎁 <b>NEW FREE LEAD MAGNET DOWNLOAD!</b>\n\n` +
+      `👤 <b>Name:</b> ${cleanName}\n` +
+      `📧 <b>Email:</b> ${cleanEmail}\n` +
+      `📞 <b>WhatsApp:</b> ${cleanPhone}\n` +
+      `📦 <b>Project:</b> ${project.title}\n\n` +
+      `💡 <i>Captured new developer lead!</i>`;
+
+    const replyMarkup = {
+      inline_keyboard: [
+        [
+          {
+            text: '💬 WhatsApp Lead',
+            url: `https://wa.me/91${cleanPhoneDigits}?text=Hi%20${encodeURIComponent(cleanName)},%20thanks%20for%20downloading%20${encodeURIComponent(project.title)}%20from%20ApexMarket!`,
+          },
+        ],
+      ],
+    };
+    sendTelegramMessage(tgText, replyMarkup).catch(() => {});
+
+    // 6. Generate download link & dispatch email
+    const downloadUrl = project.externalDownloadUrl || `/api/projects/${project._id}/download-secure`;
+    sendPurchaseEmail(cleanEmail, cleanName, order, [{ title: project.title, downloadUrl }]).catch((err) => {
+      console.warn('[FREE ORDER EMAIL ERROR]:', err.message);
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Download ready! Your free source code link is unlocked.',
+      orderId: order._id,
+      downloadUrl,
+      projectTitle: project.title,
+      token: autoToken,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Free download error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process free download. Please try again.',
+      error: error.message,
+    });
+  }
 };
