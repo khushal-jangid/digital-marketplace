@@ -21,6 +21,7 @@ import projectRequestRoutes from './routes/projectRequestRoutes.js';
 import affiliateRoutes from './routes/affiliateRoutes.js';
 import flashSaleRoutes from './routes/flashSaleRoutes.js';
 import customProjectRoutes from './routes/customProjectRoutes.js';
+import settingsRoutes from './routes/settingsRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -134,6 +135,7 @@ app.use('/api/project-requests', projectRequestRoutes);
 app.use('/api/affiliates', affiliateRoutes);
 app.use('/api/flash-sale', flashSaleRoutes);
 app.use('/api/custom-projects', customProjectRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check / Root path handler
 app.get('/', (req, res) => {
