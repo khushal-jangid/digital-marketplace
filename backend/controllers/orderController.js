@@ -1,11 +1,11 @@
-import mongoose from 'mongoose';
+﻿import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Project from '../models/Project.js';
 import User from '../models/User.js';
 import DownloadLog from '../models/DownloadLog.js';
 import AbandonedLead from '../models/AbandonedLead.js';
 import { generateSignedDownloadUrl } from '../config/storage.js';
-import { sendPurchaseEmail, sendRejectionEmail, sendRecoveryEmail } from '../config/mail.js';
+import { sendPurchaseEmail, sendRejectionEmail, sendRecoveryEmail, sendOrderPendingEmail } from '../config/mail.js';
 import { sendTelegramMessage, answerCallbackQuery, editTelegramMessage } from '../config/telegram.js';
 import { signJwt, verifyJwt } from '../config/jwt.js';
 import couponService from '../services/couponService.js';
@@ -242,6 +242,11 @@ export const createQrOrder = async (req, res) => {
 
     sendTelegramMessage(tgText, replyMarkup).catch(() => {});
 
+    // Send instant confirmation email to customer that order is submitted & pending verification
+    sendOrderPendingEmail(cleanEmail, authUser?.name || cleanEmail.split('@')[0], order, cleanUtr, projects).catch((err) => {
+      console.warn('[ORDER PENDING EMAIL NOTICE]:', err.message);
+    });
+
     return res.status(201).json({
       success: true,
       message: 'UTR Submitted Successfully! Once verified by Admin, your download access will be unlocked.',
@@ -266,6 +271,81 @@ export const createQrOrder = async (req, res) => {
 };
 
 /**
+ * Unified Order Approval Logic - works for both Admin Web and Telegram 1-click Approval
+ */
+export const processOrderApproval = async (orderId) => {
+  const order = await Order.findById(orderId).populate('items.project').populate('user');
+  if (!order) {
+    throw new Error('Order not found');
+  }
+
+  if (order.paymentStatus === 'paid' || order.paymentStatus === 'fulfilled') {
+    return { order, alreadyApproved: true };
+  }
+
+  order.paymentStatus = 'paid';
+  await order.save();
+
+  if (order.couponApplied) {
+    await couponService.redeemCoupon(order.couponApplied).catch(() => {});
+  }
+  await creditAffiliateIfReferred(order).catch(() => {});
+
+  const downloadLinks = [];
+  for (const item of (order.items || [])) {
+    if (!item.project) continue;
+    const proj = item.project;
+    const directUrl =
+      proj.externalDownloadUrl ||
+      proj.fileUrl ||
+      item.externalDownloadUrl ||
+      item.fileUrl ||
+      'https://apexmarketstore.vercel.app/dashboard';
+
+    downloadLinks.push({
+      title: proj.title || item.titleAtPurchase || 'Download Link',
+      downloadUrl: directUrl,
+    });
+  }
+
+  const customerEmail = order.contactEmail || order.user?.email;
+  const customerName = order.user?.name || (customerEmail ? customerEmail.split('@')[0] : 'Valued Developer');
+
+  if (customerEmail) {
+    console.log(`[ORDER APPROVED] Dispatching purchase email to ${customerEmail}`);
+    sendPurchaseEmail(customerEmail, customerName, order, downloadLinks).catch((err) => {
+      console.error('[PURCHASE EMAIL ERROR]:', err.message);
+    });
+  }
+
+  return { order, alreadyApproved: false, downloadLinks };
+};
+
+/**
+ * Unified Order Rejection Logic
+ */
+export const processOrderRejection = async (orderId, reason = 'UTR verification unsuccessful') => {
+  const order = await Order.findById(orderId).populate('user');
+  if (!order) {
+    throw new Error('Order not found');
+  }
+
+  order.paymentStatus = 'failed';
+  await order.save();
+
+  const customerEmail = order.contactEmail || order.user?.email;
+  const customerName = order.user?.name || 'Customer';
+
+  if (customerEmail) {
+    sendRejectionEmail(customerEmail, customerName, order, reason).catch((err) => {
+      console.error('[REJECTION EMAIL ERROR]:', err.message);
+    });
+  }
+
+  return order;
+};
+
+/**
  * @desc    Approve manual QR code payment UTR (Admin only)
  * @route   POST /api/orders/verify-utr/:id
  * @access  Private/Admin
@@ -273,46 +353,13 @@ export const createQrOrder = async (req, res) => {
 export const verifyUtrOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
-    const hostUrl = `${req.protocol}://${req.get('host')}`;
-
     if (!mongoose.Types.ObjectId.isValid(orderId)) {
       return res.status(400).json({ success: false, code: 'INVALID_ID', message: 'Invalid order ID' });
     }
 
-    const order = await Order.findById(orderId).populate('items.project').populate('user');
-    if (!order) return res.status(404).json({ success: false, code: 'ORDER_NOT_FOUND', message: 'Order not found' });
-
-    if (order.paymentStatus === 'paid' || order.paymentStatus === 'fulfilled') {
+    const { order, alreadyApproved } = await processOrderApproval(orderId);
+    if (alreadyApproved) {
       return res.json({ success: true, message: 'Order is already approved', order });
-    }
-
-    order.paymentStatus = 'paid';
-    await order.save();
-
-    if (order.couponApplied) {
-      await couponService.redeemCoupon(order.couponApplied).catch(() => {});
-    }
-    await creditAffiliateIfReferred(order);
-
-    const downloadLinks = [];
-    const userIdStr = order.user && order.user._id ? order.user._id.toString() : 'guest_user';
-
-    for (const item of order.items) {
-      if (!item.project) continue;
-      const proj = item.project;
-      const directUrl = proj.externalDownloadUrl || proj.fileUrl || item.externalDownloadUrl || item.fileUrl || 'https://apexmarketstore.vercel.app/dashboard';
-
-      downloadLinks.push({
-        title: proj.title || item.titleAtPurchase || 'Download Link',
-        downloadUrl: directUrl,
-      });
-    }
-
-    const customerEmail = order.contactEmail || order.user?.email;
-    const customerName = order.user?.name || customerEmail?.split('@')[0] || 'Valued Developer';
-
-    if (customerEmail) {
-      sendPurchaseEmail(customerEmail, customerName, order, downloadLinks).catch(() => {});
     }
 
     return res.json({
@@ -329,20 +376,7 @@ export const rejectUtrOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
     const { reason } = req.body;
-
-    const order = await Order.findById(orderId).populate('user');
-    if (!order) return res.status(404).json({ success: false, code: 'ORDER_NOT_FOUND', message: 'Order not found' });
-
-    order.paymentStatus = 'failed';
-    await order.save();
-
-    const customerEmail = order.contactEmail || order.user?.email;
-    const customerName = order.user?.name || 'Customer';
-
-    if (customerEmail) {
-      sendRejectionEmail(customerEmail, customerName, order, reason || 'UTR verification unsuccessful').catch(() => {});
-    }
-
+    const order = await processOrderRejection(orderId, reason || 'UTR verification unsuccessful');
     return res.json({ success: true, message: 'Order marked as rejected.', order });
   } catch (error) {
     return res.status(500).json({ success: false, code: 'REJECT_ERROR', message: error.message });
@@ -511,20 +545,16 @@ export const telegramWebhook = async (req, res) => {
 
     if (data.startsWith('approve_')) {
       const orderId = data.split('_')[1];
-      const order = await Order.findById(orderId).populate('items.project').populate('user');
-      if (order && order.paymentStatus !== 'paid') {
-        order.paymentStatus = 'paid';
-        await order.save();
-        await answerCallbackQuery(callbackQueryId, '✅ Order Approved & Download Unlocked!');
-        await editTelegramMessage(chatId, messageId, `✅ <b>ORDER APPROVED</b> (ID: ${orderId})`);
+      await processOrderApproval(orderId);
+      await answerCallbackQuery(callbackQueryId, '✅ Order Approved & Download Emailed!');
+      if (chatId && messageId) {
+        await editTelegramMessage(chatId, messageId, `✅ <b>ORDER APPROVED & DOWNLOAD EMAILED!</b> (ID: ${orderId})`);
       }
     } else if (data.startsWith('reject_')) {
       const orderId = data.split('_')[1];
-      const order = await Order.findById(orderId);
-      if (order) {
-        order.paymentStatus = 'failed';
-        await order.save();
-        await answerCallbackQuery(callbackQueryId, '❌ Order Rejected');
+      await processOrderRejection(orderId, 'Payment verification unsuccessful');
+      await answerCallbackQuery(callbackQueryId, '❌ Order Rejected');
+      if (chatId && messageId) {
         await editTelegramMessage(chatId, messageId, `❌ <b>ORDER REJECTED</b> (ID: ${orderId})`);
       }
     }
@@ -544,25 +574,17 @@ export const handleTelegramCallback = async (callbackQuery) => {
   try {
     if (data.startsWith('approve_')) {
       const orderId = data.replace('approve_', '');
-      const order = await Order.findById(orderId).populate('items.project').populate('user');
-      if (order && order.paymentStatus !== 'paid') {
-        order.paymentStatus = 'paid';
-        await order.save();
-        await answerCallbackQuery(callbackQueryId, '✅ Order Approved & Download Unlocked!');
-        if (chatId && messageId) {
-          await editTelegramMessage(chatId, messageId, `✅ <b>ORDER APPROVED & DOWNLOAD UNLOCKED</b> (ID: ${orderId})`).catch(() => {});
-        }
+      await processOrderApproval(orderId);
+      await answerCallbackQuery(callbackQueryId, '✅ Order Approved & Download Emailed!');
+      if (chatId && messageId) {
+        await editTelegramMessage(chatId, messageId, `✅ <b>ORDER APPROVED & DOWNLOAD EMAILED</b> (ID: ${orderId})`).catch(() => {});
       }
     } else if (data.startsWith('reject_')) {
       const orderId = data.replace('reject_', '');
-      const order = await Order.findById(orderId);
-      if (order) {
-        order.paymentStatus = 'failed';
-        await order.save();
-        await answerCallbackQuery(callbackQueryId, '❌ Order Rejected');
-        if (chatId && messageId) {
-          await editTelegramMessage(chatId, messageId, `❌ <b>ORDER REJECTED</b> (ID: ${orderId})`).catch(() => {});
-        }
+      await processOrderRejection(orderId, 'Payment verification unsuccessful');
+      await answerCallbackQuery(callbackQueryId, '❌ Order Rejected');
+      if (chatId && messageId) {
+        await editTelegramMessage(chatId, messageId, `❌ <b>ORDER REJECTED</b> (ID: ${orderId})`).catch(() => {});
       }
     }
   } catch (err) {
