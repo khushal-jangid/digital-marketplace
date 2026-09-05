@@ -227,25 +227,7 @@ export const sendNewProjectEmail = async (subscribersList, project) => {
   `;
 
   for (const email of emails) {
-    const sent = await sendMailViaVercelBridge(email, `🚀 New Launch: ${project.title} is now available!`, htmlContent);
-    if (!sent && transporter) {
-      try {
-        await transporter.sendMail({
-          from: smtpFrom,
-          to: email,
-          subject: `🚀 New Launch: ${project.title} is now available!`,
-          html: htmlContent,
-        });
-      } catch (err) {
-        console.error('Error sending project broadcast to', email, err.message);
-      }
-    }
-  } else {
-    console.log('\n--- NEW PROJECT BROADCAST EMAIL (MOCK) ---');
-    console.log(`BCC: ${emails.join(', ')}`);
-    console.log(`Subject: New Launch: ${project.title}`);
-    console.log(`Link: https://apexmarketstore.vercel.app/projects/${project._id}`);
-    console.log('-------------------------------------------\n');
+    await dispatchMail(email, `🚀 New Launch: ${project.title} is now available!`, htmlContent);
   }
 };
 
@@ -288,25 +270,7 @@ export const sendNewCouponEmail = async (subscribersList, coupon) => {
   `;
 
   for (const email of emails) {
-    const sent = await sendMailViaVercelBridge(email, `🎉 Exclusive offer: Get discount using code ${coupon.code}!`, htmlContent);
-    if (!sent && transporter) {
-      try {
-        await transporter.sendMail({
-          from: smtpFrom,
-          to: email,
-          subject: `🎉 Exclusive offer: Get discount using code ${coupon.code}!`,
-          html: htmlContent,
-        });
-      } catch (err) {
-        console.error('Error sending coupon broadcast to', email, err.message);
-      }
-    }
-  } else {
-    console.log('\n--- NEW COUPON BROADCAST EMAIL (MOCK) ---');
-    console.log(`BCC: ${emails.join(', ')}`);
-    console.log(`Subject: Discount coupon code ${coupon.code}!`);
-    console.log(`Discount: ${coupon.discountValue}`);
-    console.log('-----------------------------------------\n');
+    await dispatchMail(email, `🎉 Exclusive offer: Get discount using code ${coupon.code}!`, htmlContent);
   }
 };
 
@@ -388,27 +352,13 @@ export const sendRejectionEmail = async (toEmail, userName, order) => {
 
   const subject = `Payment Verification Failed - Order ${order.razorpayOrderId || order._id}`;
 
-  if (smtpUser && smtpPass) {
-    const sent = await sendMailViaVercelBridge(toEmail, subject, htmlContent);
-    if (sent) return;
-  }
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: smtpFrom,
-        to: toEmail,
-        subject,
-        html: htmlContent,
-      });
-      console.log(`Rejection email successfully sent to ${toEmail}`);
-    } catch (error) {
-      console.error('Error sending rejection email:', error.message);
-    }
+  const sent = await dispatchMail(toEmail, subject, htmlContent);
+  if (sent) {
+    console.log(`Rejection email successfully sent to ${toEmail}`);
   } else {
     console.log('\n--- EMAIL SENT (REJECTION MOCK) ---');
     console.log(`To: ${toEmail}`);
-    console.log(`Subject: Payment Verification Failed - Order ${order.razorpayOrderId || order._id}`);
+    console.log(`Subject: ${subject}`);
     console.log('-----------------------------------\n');
   }
 };
@@ -445,25 +395,10 @@ export const sendUpdateNotificationEmail = async (toEmail, userName, project) =>
 
   const subject = `New Update Available: ${project.title}`;
 
-  if (smtpUser && smtpPass) {
-    const sent = await sendMailViaVercelBridge(toEmail, subject, htmlContent);
-    if (sent) return true;
-  }
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: smtpFrom,
-        to: toEmail,
-        subject,
-        html: htmlContent,
-      });
-      console.log(`Update notification email successfully sent to ${toEmail}`);
-      return true;
-    } catch (error) {
-      console.error('Error sending update email:', error.message);
-      return false;
-    }
+  const sent = await dispatchMail(toEmail, subject, htmlContent);
+  if (sent) {
+    console.log(`Update notification email successfully sent to ${toEmail}`);
+    return true;
   } else {
     console.log('\n--- EMAIL SENT (UPDATE NOTIFICATION MOCK) ---');
     console.log(`To: ${toEmail}`);
@@ -481,25 +416,10 @@ export const sendUpdateNotificationEmail = async (toEmail, userName, project) =>
 export const sendRecoveryEmail = async (toEmail, htmlContent) => {
   const subject = "Complete your purchase and save 10%!";
   
-  if (smtpUser && smtpPass) {
-    const sent = await sendMailViaVercelBridge(toEmail, subject, htmlContent);
-    if (sent) return true;
-  }
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: smtpFrom,
-        to: toEmail,
-        subject,
-        html: htmlContent,
-      });
-      console.log(`Recovery email successfully sent to ${toEmail}`);
-      return true;
-    } catch (error) {
-      console.error('Error sending recovery email:', error.message);
-      return false;
-    }
+  const sent = await dispatchMail(toEmail, subject, htmlContent);
+  if (sent) {
+    console.log(`Recovery email successfully sent to ${toEmail}`);
+    return true;
   } else {
     console.log('\n--- EMAIL SENT (RECOVERY MOCK) ---');
     console.log(`To: ${toEmail}`);
@@ -571,20 +491,7 @@ export const sendCustomProjectAdminAlert = async (details) => {
     </div>
   `;
 
-  if (smtpUser && smtpPass) {
-    const sent = await sendMailViaVercelBridge(adminEmail, subject, html);
-    if (sent) return;
-  }
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({ from: smtpFrom, to: adminEmail, subject, html });
-    } catch (e) {
-      console.error('Failed to send custom project email to admin:', e.message);
-    }
-  } else {
-    console.log(`[Custom Project Alert Sent to Admin ${adminEmail}]`);
-  }
+  await dispatchMail(adminEmail, subject, html);
 };
 
 /**
@@ -625,20 +532,7 @@ export const sendCustomProjectClientConfirmation = async (details) => {
     </div>
   `;
 
-  if (smtpUser && smtpPass) {
-    const sent = await sendMailViaVercelBridge(details.email, subject, html);
-    if (sent) return;
-  }
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({ from: smtpFrom, to: details.email, subject, html });
-    } catch (e) {
-      console.error('Failed to send confirmation email to client:', e.message);
-    }
-  } else {
-    console.log(`[Custom Project Confirmation Sent to Client ${details.email}]`);
-  }
+  await dispatchMail(details.email, subject, html);
 };
 
 
