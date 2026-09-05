@@ -36,6 +36,8 @@ import {
   ExternalLink,
   MessageCircle,
   LogOut,
+  Sliders,
+  Wrench,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -128,6 +130,68 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('analytics');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [couponNotification, setCouponNotification] = useState(null);
+
+  // Store Settings & Add-on state
+  const [setupPriceSetting, setSetupPriceSetting] = useState(199);
+  const [setupEnabledSetting, setSetupEnabledSetting] = useState(true);
+  const [setupTitleSetting, setSetupTitleSetting] = useState('1-on-1 Remote Setup Help (AnyDesk / Google Meet)');
+  const [setupDescSetting, setSetupDescSetting] = useState('Skip the hassle of .env config, database connections, and running commands. We will remotely set up and run the code on your laptop!');
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsSuccess, setSettingsSuccess] = useState('');
+  const [settingsError, setSettingsError] = useState('');
+
+  const fetchStoreSettings = async () => {
+    setSettingsLoading(true);
+    try {
+      const res = await request('/settings', 'GET');
+      if (res?.success && res.settings) {
+        if (res.settings.setup_assistance_price !== undefined) {
+          setSetupPriceSetting(Number(res.settings.setup_assistance_price));
+        }
+        if (res.settings.setup_assistance_enabled !== undefined) {
+          setSetupEnabledSetting(Boolean(res.settings.setup_assistance_enabled));
+        }
+        if (res.settings.setup_assistance_title) {
+          setSetupTitleSetting(res.settings.setup_assistance_title);
+        }
+        if (res.settings.setup_assistance_desc) {
+          setSetupDescSetting(res.settings.setup_assistance_desc);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch settings:', err.message);
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  const handleSaveStoreSettings = async (e) => {
+    e.preventDefault();
+    setSettingsSaving(true);
+    setSettingsSuccess('');
+    setSettingsError('');
+
+    try {
+      const res = await request('/settings', 'POST', {
+        setup_assistance_price: Number(setupPriceSetting),
+        setup_assistance_enabled: Boolean(setupEnabledSetting),
+        setup_assistance_title: setupTitleSetting.trim(),
+        setup_assistance_desc: setupDescSetting.trim(),
+      });
+
+      if (res?.success) {
+        setSettingsSuccess('Store settings saved successfully!');
+        setTimeout(() => setSettingsSuccess(''), 4000);
+      } else {
+        setSettingsError(res?.message || 'Failed to save settings');
+      }
+    } catch (err) {
+      setSettingsError(err.message || 'Error saving settings');
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
 
   // Custom Project Commission Inquiries & ₹50 Fee State
   const [customProjects, setCustomProjects] = useState([]);
@@ -659,6 +723,7 @@ const AdminDashboard = () => {
         else if (tabParam === 'products') setActiveTab('products');
         else if (tabParam === 'reviews') setActiveTab('reviews');
         else if (tabParam === 'requests') setActiveTab('featureRequests');
+    else if (tabParam === 'settings' || tabParam === 'store-settings') setActiveTab('settings');
       }
 
       // Handle direct orderData payload from Telegram alert buttons
@@ -1019,6 +1084,7 @@ const AdminDashboard = () => {
           { id: 'customProjects', label: 'Custom Requests (₹50) 💼', icon: <Code size={15} style={{ color: '#06b6d4' }} /> },
           { id: 'orders', label: 'Orders & UTR', icon: <ShoppingCart size={15} /> },
           { id: 'products', label: 'Products Catalog', icon: <FolderOpen size={15} /> },
+          { id: 'settings', label: 'Store Settings & Add-ons 🛠️', icon: <Sliders size={15} style={{ color: '#a855f7' }} /> },
           { id: 'coupons', label: 'Discount Coupons', icon: <Ticket size={15} /> },
           { id: 'flashSale', label: 'Festival & Flash Sale 🪔⚡', icon: <Sparkles size={15} style={{ color: '#f59e0b' }} /> },
           { id: 'reviews', label: 'Customer Reviews', icon: <Star size={15} /> },
@@ -1277,7 +1343,7 @@ const AdminDashboard = () => {
                           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>File: {proj.fileName} ({proj.fileSize})</span>
                         </td>
                         <td style={{ padding: '12px 8px', textTransform: 'capitalize' }}>{proj.category}</td>
-                        <td style={{ padding: '12px 8px', fontWeight: 600 }}>INR {proj.price}</td>
+                        <td style={{ padding: '12px 8px', fontWeight: 600 }}>{Number(proj.price) === 0 ? <span style={{ color: '#10b981', fontWeight: 700 }}>🎁 FREE</span> : `INR ${proj.price}`}</td>
                         <td style={{ padding: '12px 8px' }}>
                           <button
                             onClick={() => handleStartEdit(proj)}
@@ -1351,10 +1417,13 @@ const AdminDashboard = () => {
                     type="number"
                     required
                     className="form-input"
-                    placeholder="299"
+                    placeholder="299 (Enter 0 for Free)"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                   />
+                  <span style={{ fontSize: '11px', color: '#10b981', display: 'block', marginTop: '4px', fontWeight: 600 }}>
+                    💡 Enter 0 for Free Lead Magnet
+                  </span>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
@@ -1453,6 +1522,210 @@ const AdminDashboard = () => {
       )}
 
       {/* Coupons Tab */}
+      {/* Store Settings & Add-on Management Tab */}
+      {activeTab === 'settings' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="glass-card" style={{ maxWidth: '850px' }}>
+            <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '14px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sliders size={20} style={{ color: 'var(--primary)' }} /> Store Add-ons & Service Pricing
+                </h3>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  Control your 1-on-1 remote setup assistance fee, toggle services, and lead capture settings.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={fetchStoreSettings}
+                className="btn btn-secondary"
+                style={{ padding: '6px 12px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                disabled={settingsLoading}
+              >
+                <RefreshCw size={13} className={settingsLoading ? 'animate-spin' : ''} /> Refresh
+              </button>
+            </div>
+
+            {settingsSuccess && (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.15)',
+                color: '#10b981',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                marginBottom: '18px',
+                fontWeight: 600,
+                fontSize: '13.5px',
+                border: '1px solid rgba(16, 185, 129, 0.3)'
+              }}>
+                ✓ {settingsSuccess}
+              </div>
+            )}
+
+            {settingsError && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.15)',
+                color: '#ef4444',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                marginBottom: '18px',
+                fontWeight: 600,
+                fontSize: '13.5px',
+                border: '1px solid rgba(239, 68, 68, 0.3)'
+              }}>
+                ✕ {settingsError}
+              </div>
+            )}
+
+            {settingsLoading ? (
+              <Loader />
+            ) : (
+              <form onSubmit={handleSaveStoreSettings} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                
+                {/* 1-on-1 Remote Setup Help Section */}
+                <div style={{
+                  background: 'var(--bg-tertiary)',
+                  padding: '20px',
+                  borderRadius: '12px',
+                  border: '1px solid var(--border)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Wrench size={18} style={{ color: 'var(--primary)' }} />
+                      <strong style={{ fontSize: '15px', color: 'var(--text-primary)' }}>
+                        1-on-1 Remote Setup &amp; Installation Assistance Add-on
+                      </strong>
+                    </div>
+
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={setupEnabledSetting}
+                        onChange={(e) => setSetupEnabledSetting(e.target.checked)}
+                        style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: setupEnabledSetting ? 'var(--success)' : 'var(--text-muted)' }}>
+                        {setupEnabledSetting ? 'Active / Enabled' : 'Disabled'}
+                      </span>
+                    </label>
+                  </div>
+
+                  <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
+                    This add-on appears on the <strong>Cart &amp; Checkout page</strong>. When checked by buyers, the price is automatically added to their UPI QR payment and you receive a notification to schedule their AnyDesk/Meet setup session.
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                        Add-on Price (INR) *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        className="form-input"
+                        placeholder="199"
+                        value={setupPriceSetting}
+                        onChange={(e) => setSetupPriceSetting(e.target.value)}
+                        style={{ fontWeight: 700, fontSize: '15px', color: 'var(--primary)' }}
+                      />
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                        Current add-on fee charged to customer
+                      </span>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                        Service Title *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="form-input"
+                        value={setupTitleSetting}
+                        onChange={(e) => setSetupTitleSetting(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '14px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Add-on Description *
+                    </label>
+                    <textarea
+                      rows="2"
+                      required
+                      className="form-input"
+                      value={setupDescSetting}
+                      onChange={(e) => setSetupDescSetting(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Lead Magnet Free Projects Guide */}
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  padding: '18px 20px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  display: 'flex',
+                  gap: '14px',
+                  alignItems: 'flex-start'
+                }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    color: '#10b981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Gift size={20} />
+                  </div>
+                  <div>
+                    <strong style={{ fontSize: '14.5px', color: '#10b981', display: 'block', marginBottom: '4px' }}>
+                      🎁 How to Create Free Lead Magnet Projects
+                    </strong>
+                    <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                      To set any project as a free lead magnet, switch to the <strong>Products Catalog</strong> tab and set its <strong>Selling Price to 0</strong>.
+                      Visitors will see a <strong>FREE badge</strong> and a <strong>1-Click Free Download Modal</strong> that captures their Full Name, Email, and WhatsApp number before delivering the source code. You can edit the price anytime!
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button
+                    type="submit"
+                    disabled={settingsSaving}
+                    className="btn btn-primary"
+                    style={{
+                      padding: '12px 28px',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {settingsSaving ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" /> Saving Changes...
+                      </>
+                    ) : (
+                      <>
+                        💾 Save Store Settings
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'coupons' && (
         <div className="responsive-admin-grid" style={{
           alignItems: 'flex-start'
@@ -2160,6 +2433,40 @@ const AdminDashboard = () => {
                       <td style={{ padding: '12px 8px' }}>
                         <strong style={{ color: 'var(--text-primary)', display: 'block' }}>{o.user?.name || 'N/A'}</strong>
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{o.user?.email || 'N/A'}</span>
+                        {o.includeSetupAssistance && (
+                          <div style={{
+                            marginTop: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: 'rgba(99, 102, 241, 0.15)',
+                            color: '#818cf8',
+                            border: '1px solid rgba(99, 102, 241, 0.35)',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                          }}>
+                            🛠️ Setup Help Requested (+₹{o.setupAssistancePrice || 199})
+                          </div>
+                        )}
+                        {o.paymentMethod === 'free' && (
+                          <div style={{
+                            marginTop: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            color: '#10b981',
+                            border: '1px solid rgba(16, 185, 129, 0.35)',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                          }}>
+                            🎁 Free Lead Download
+                          </div>
+                        )}
                         {o.paymentMethod === 'qr_code' && (
                           <div style={{
                             marginTop: '8px',
