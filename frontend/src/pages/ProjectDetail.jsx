@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -471,7 +471,7 @@ const ProjectDetail = () => {
           <div className="glass-card" style={{ border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <span className="badge badge-primary">
-                {selectedLicense === 'commercial' ? 'Commercial License' : 'Personal License'}
+                Personal License
               </span>
               <button
                 onClick={handleWishlistToggle}
@@ -491,20 +491,19 @@ const ProjectDetail = () => {
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: '32px', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  {formatPrice(selectedLicense === 'commercial' ? Math.round(project.price * 2.2) : project.price)}
+                  {formatPrice(project.price)}
                 </span>
                 {(() => {
                   const baseMrp = project.originalPrice && project.originalPrice > project.price
                     ? project.originalPrice
                     : Math.round(project.price * 1.5);
-                  const effectiveMrp = selectedLicense === 'commercial' ? Math.round(baseMrp * 2.2) : baseMrp;
-                  const currentPrice = selectedLicense === 'commercial' ? Math.round(project.price * 2.2) : project.price;
-                  const discountPercent = Math.round(((effectiveMrp - currentPrice) / effectiveMrp) * 100);
+                  const currentPrice = project.price;
+                  const discountPercent = Math.round(((baseMrp - currentPrice) / baseMrp) * 100);
                   if (discountPercent <= 0) return null;
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{ fontSize: '17px', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
-                        {formatPrice(effectiveMrp)}
+                        {formatPrice(baseMrp)}
                       </span>
                       <span style={{ fontSize: '12px', fontWeight: 800, color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '2px 8px', borderRadius: '6px' }}>
                         {discountPercent}% OFF
@@ -518,29 +517,25 @@ const ProjectDetail = () => {
               </span>
             </div>
 
-            {/* License Selection Segmented Control */}
+            {/* License Details */}
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
-                Select License Type:
+                Included License:
               </label>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {/* Personal License Option */}
+              <div>
+                {/* Personal License */}
                 <div
-                  onClick={() => setSelectedLicense('personal')}
                   style={{
                     padding: '12px',
                     borderRadius: '8px',
-                    border: '1.5px solid',
-                    borderColor: selectedLicense === 'personal' ? 'var(--primary)' : 'var(--border)',
-                    background: selectedLicense === 'personal' ? 'rgba(99, 102, 241, 0.1)' : 'var(--bg-tertiary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
+                    border: '1.5px solid var(--primary)',
+                    background: 'rgba(99, 102, 241, 0.08)',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <strong style={{ fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <CheckCircle size={14} style={{ color: selectedLicense === 'personal' ? 'var(--primary)' : 'transparent' }} />
+                      <CheckCircle size={14} style={{ color: 'var(--primary)' }} />
                       Personal License
                     </strong>
                     <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -549,33 +544,6 @@ const ProjectDetail = () => {
                   </div>
                   <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>
                     Single end product, student learning, personal portfolio.
-                  </p>
-                </div>
-
-                {/* Commercial License Option */}
-                <div
-                  onClick={() => setSelectedLicense('commercial')}
-                  style={{
-                    padding: '12px',
-                    borderRadius: '8px',
-                    border: '1.5px solid',
-                    borderColor: selectedLicense === 'commercial' ? '#10b981' : 'var(--border)',
-                    background: selectedLicense === 'commercial' ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-tertiary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <strong style={{ fontSize: '13px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <ShieldCheck size={14} style={{ color: selectedLicense === 'commercial' ? '#10b981' : 'var(--text-muted)' }} />
-                      Commercial / Agency
-                    </strong>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#10b981' }}>
-                      {formatPrice(Math.round(project.price * 2.2))}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>
-                    Unlimited client websites, SaaS commercial deployment & resale.
                   </p>
                 </div>
               </div>
@@ -653,7 +621,7 @@ const ProjectDetail = () => {
                 style={{ width: '100%', padding: '14px', marginTop: '10px' }}
               >
                 <ShoppingCart size={18} />
-                {inCart ? 'Go to Shopping Cart' : `Buy ${selectedLicense === 'commercial' ? 'Commercial' : 'Personal'} (${formatPrice(selectedLicense === 'commercial' ? Math.round(project.price * 2.2) : project.price)})`}
+                {inCart ? 'Go to Shopping Cart' : `Buy Now (${formatPrice(project.price)})`}
               </button>
             )}
           </div>
