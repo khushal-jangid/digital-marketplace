@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -212,23 +212,19 @@ const Cart = () => {
                   <h3 style={{ fontSize: '16px', color: 'var(--text-primary)', marginBottom: '6px' }}>{item.title}</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span className="badge badge-primary">{item.category}</span>
-                    <select
-                      value={item.licenseType || 'personal'}
-                      onChange={(e) => updateLicense(item._id, e.target.value)}
+                    <span
                       style={{
                         padding: '3px 8px',
                         fontSize: '11px',
                         fontWeight: 600,
                         borderRadius: '4px',
-                        background: 'var(--bg-tertiary)',
+                        background: 'rgba(99, 102, 241, 0.1)',
                         border: '1px solid var(--border)',
-                        color: item.licenseType === 'commercial' ? '#10b981' : 'var(--text-secondary)',
-                        cursor: 'pointer',
+                        color: 'var(--primary)',
                       }}
                     >
-                      <option value="personal">Personal License</option>
-                      <option value="commercial">Commercial License (2.2x)</option>
-                    </select>
+                      Personal License
+                    </span>
                   </div>
                 </div>
 
