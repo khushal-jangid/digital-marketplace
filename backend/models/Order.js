@@ -62,7 +62,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['gateway', 'qr_code', 'upi'],
+      enum: ['gateway', 'qr_code', 'upi', 'free'],
       default: 'gateway',
     },
     transactionRef: {
@@ -87,6 +87,15 @@ const orderSchema = new mongoose.Schema(
       default: null,
       trim: true,
       uppercase: true,
+    },
+    includeSetupAssistance: {
+      type: Boolean,
+      default: false,
+    },
+    setupAssistancePrice: {
+      type: Number,
+      default: 0,
+      min: [0, 'Setup assistance price cannot be negative'],
     },
     affiliateCredited: {
       type: Boolean,
