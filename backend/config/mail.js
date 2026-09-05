@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+﻿import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -24,6 +24,9 @@ if (smtpHost && smtpUser && smtpPass) {
           user: smtpUser,
           pass: smtpPass,
         },
+        connectionTimeout: 4000,
+        greetingTimeout: 4000,
+        socketTimeout: 6000,
       }
     : {
         host: smtpHost,
@@ -33,6 +36,9 @@ if (smtpHost && smtpUser && smtpPass) {
           user: smtpUser,
           pass: smtpPass,
         },
+        connectionTimeout: 4000,
+        greetingTimeout: 4000,
+        socketTimeout: 6000,
       };
 
   transporter = nodemailer.createTransport(transportConfig);
@@ -41,10 +47,23 @@ if (smtpHost && smtpUser && smtpPass) {
   console.log('SMTP credentials missing. Mail will be logged to system console.');
 }
 
-const sendMailViaVercelBridge = async (toEmail, subject, htmlContent) => {
-  const vercelUrl = process.env.VERCEL_MAILER_URL || process.env.CLIENT_URL || 'https://apexmarketstore.vercel.app';
+export const getVercelMailerUrl = () => {
+  if (process.env.VERCEL_MAILER_URL && process.env.VERCEL_MAILER_URL.startsWith('http')) {
+    return process.env.VERCEL_MAILER_URL.replace(/\/+$/, '');
+  }
+  if (process.env.CLIENT_URL && process.env.CLIENT_URL.startsWith('https://') && !process.env.CLIENT_URL.includes('localhost')) {
+    return process.env.CLIENT_URL.replace(/\/+$/, '');
+  }
+  return 'https://apexmarketstore.vercel.app';
+};
+
+export const sendMailViaVercelBridge = async (toEmail, subject, htmlContent, textContent = '') => {
+  const vercelUrl = getVercelMailerUrl();
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+
     const response = await fetch(`${vercelUrl}/api/send-email`, {
       method: 'POST',
       headers: {
@@ -54,21 +73,56 @@ const sendMailViaVercelBridge = async (toEmail, subject, htmlContent) => {
         to: toEmail,
         subject,
         html: htmlContent,
+        text: textContent,
       }),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
 
     const data = await response.json();
     if (response.ok && data.success) {
-      console.log(`Email successfully sent via Vercel bridge to ${toEmail}`);
+      console.log(`[VERCEL BRIDGE SUCCESS] Email dispatched to ${toEmail}`);
       return true;
     } else {
-      console.error('Failed to send email via Vercel bridge:', data.error || 'Unknown error');
+      console.warn('[VERCEL BRIDGE NOTICE] Delivery error:', data?.error || data?.message || data);
       return false;
     }
   } catch (err) {
-    console.error('Error calling Vercel mailer bridge:', err.message);
+    console.warn('[VERCEL BRIDGE ERROR] Call failed:', err.message);
     return false;
   }
+};
+
+export const dispatchMail = async (toEmail, subject, htmlContent, textContent = '') => {
+  if (!toEmail || !toEmail.includes('@')) {
+    console.warn('[MAIL WARNING] Invalid recipient email:', toEmail);
+    return false;
+  }
+
+  // 1. Try Vercel bridge first (bypasses Render outbound SMTP port 465 blocking)
+  const sentViaBridge = await sendMailViaVercelBridge(toEmail, subject, htmlContent, textContent);
+  if (sentViaBridge) return true;
+
+  // 2. Direct SMTP fallback (with fast timeout)
+  if (transporter) {
+    try {
+      const info = await transporter.sendMail({
+        from: smtpFrom,
+        to: toEmail,
+        subject,
+        html: htmlContent,
+        text: textContent || undefined,
+      });
+      console.log(`[DIRECT SMTP SUCCESS] Email sent to ${toEmail} (Id: ${info.messageId})`);
+      return true;
+    } catch (e) {
+      console.error(`[DIRECT SMTP ERROR] Failed for ${toEmail}:`, e.message);
+    }
+  } else {
+    console.log(`[MOCK EMAIL LOG] To: ${toEmail} | Subject: ${subject}`);
+    return true;
+  }
+  return false;
 };
 
 /**
@@ -126,30 +180,14 @@ export const sendPurchaseEmail = async (toEmail, userName, order, downloadLinks)
 
   const subject = `🎉 Download Unlocked: Order #${order.invoiceNumber || order.razorpayOrderId || order._id}`;
 
-  if (smtpUser && smtpPass) {
-    const sent = await sendMailViaVercelBridge(toEmail, subject, htmlContent);
-    if (sent) return;
-  }
-
-  if (transporter) {
-    try {
-      await transporter.sendMail({
-        from: smtpFrom,
-        to: toEmail,
-        subject,
-        html: htmlContent,
-      });
-      console.log(`Purchase confirmation email successfully sent to ${toEmail}`);
-    } catch (error) {
-      console.error('Error sending purchase email:', error.message);
-    }
+  const sent = await dispatchMail(toEmail, subject, htmlContent);
+  if (sent) {
+    console.log(`[PURCHASE EMAIL SUCCESS] Order confirmation delivered to ${toEmail}`);
   } else {
-    // Log to console for local testing
-    console.log('\n--- EMAIL SENT (MOCK) ---');
+    console.log('\n--- EMAIL SENT (MOCK FALLBACK) ---');
     console.log(`To: ${toEmail}`);
-    console.log(`Subject: Your Purchase Confirmation - Order ${order.razorpayOrderId}`);
+    console.log(`Subject: ${subject}`);
     console.log(`Total Paid: INR ${order.totalAmount}`);
-    console.log('Download Links generated:');
     downloadLinks.forEach((link) => {
       console.log(` - ${link.title}: ${link.downloadUrl}`);
     });
@@ -603,3 +641,45 @@ export const sendCustomProjectClientConfirmation = async (details) => {
   }
 };
 
+
+/**
+ * Send order received confirmation (pending payment verification) to client
+ */
+export const sendOrderPendingEmail = async (toEmail, userName, order, utr, projects = []) => {
+  const subject = `📋 Order Received: #${order.invoiceNumber || order._id} (Verification Pending)`;
+
+  const itemsList = projects.length > 0 
+    ? projects.map(p => `<li><strong>${p.title || 'Source Code Template'}</strong></li>`).join('')
+    : (order.items || []).map(i => `<li><strong>${i.titleAtPurchase || 'Source Code Template'}</strong></li>`).join('');
+
+  const htmlContent = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #334155; line-height: 1.6; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+      <h2 style="color: #4f46e5; margin-top: 0; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">📦 Order Received! Payment Verification Pending</h2>
+      <p>Hello <strong>${userName || 'Developer'}</strong>,</p>
+      <p>Thank you for purchasing on <strong>ApexMarket</strong>! We have received your order and payment transaction reference.</p>
+
+      <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 16px 0;">
+        <p style="margin: 0 0 6px 0;"><strong>Invoice / Order ID:</strong> #${order.invoiceNumber || order._id}</p>
+        <p style="margin: 0 0 6px 0;"><strong>Amount Paid:</strong> INR ₹${order.totalAmount}</p>
+        <p style="margin: 0;"><strong>Submitted UTR:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #0f172a;">${utr}</code></p>
+      </div>
+
+      <div style="margin: 16px 0;">
+        <h4 style="margin: 0 0 8px 0; color: #1e293b;">Purchased Item(s):</h4>
+        <ul style="padding-left: 20px; margin: 0;">
+          ${itemsList}
+        </ul>
+      </div>
+
+      <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 14px; margin: 16px 0; font-size: 13.5px; color: #065f46;">
+        ⚡ <strong>Next Step:</strong> Our team is currently verifying the UTR with our banking records. Once approved, your download links and source code access will be dispatched directly to this email and will also appear on your <a href="https://apexmarketstore.vercel.app/dashboard" style="color: #047857; font-weight: bold;">Dashboard</a>!
+      </div>
+
+      <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px;">
+        Need help? Contact ApexMarket Support: khushaljangra721@gmail.com
+      </p>
+    </div>
+  `;
+
+  return await dispatchMail(toEmail, subject, htmlContent);
+};
