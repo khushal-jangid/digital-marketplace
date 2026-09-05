@@ -7,6 +7,7 @@ import {
   getAllOrders,
   getOrderById,
   createQrOrder,
+  freeDownloadOrder,
   verifyUtrOrder,
   rejectUtrOrder,
   refundOrder,
@@ -23,6 +24,7 @@ const router = express.Router();
 router.post('/checkout', protect, checkoutLimiter, checkout);
 router.post('/verify', protect, checkoutLimiter, verifyPayment);
 router.post('/qr-checkout', checkoutLimiter, createQrOrder);
+router.post('/free-download', checkoutLimiter, freeDownloadOrder);
 router.post('/abandoned-lead', saveAbandonedLead);
 router.post('/send-recovery-emails', protect, admin, sendRecoveryEmails);
 router.post('/telegram-webhook', telegramWebhook);
