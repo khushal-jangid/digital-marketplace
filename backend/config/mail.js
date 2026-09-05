@@ -158,6 +158,12 @@ export const sendPurchaseEmail = async (toEmail, userName, order, downloadLinks)
       <p>Hello ${userName || 'Developer'},</p>
       <p>Thank you for shopping at ApexMarket! Your payment has been verified and your source code is ready for download.</p>
       
+      ${order?.includeSetupAssistance ? `
+      <div style="background: #eff6ff; padding: 16px; border-radius: 8px; border: 1.5px solid #3b82f6; margin: 16px 0;">
+        <h4 style="margin: 0 0 6px 0; color: #1d4ed8; font-size: 15px;">🛠️ 1-on-1 Remote Setup Help Included</h4>
+        <p style="margin: 0; color: #1e40af; font-size: 13px;">You have added remote setup assistance. Our engineering team will message you via WhatsApp or Email to schedule your live AnyDesk / Google Meet session!</p>
+      </div>` : ''}
+
       <div style="background: #f8fafc; padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 16px 0;">
         <p style="margin: 0 0 6px 0;"><strong>Invoice ID:</strong> ${order.invoiceNumber || order.razorpayOrderId || order._id}</p>
         <p style="margin: 0;"><strong>Total Paid:</strong> INR ₹${order.totalAmount}</p>
