@@ -37,7 +37,7 @@ const couponSchema = new mongoose.Schema(
     },
     usageLimit: {
       type: Number,
-      default: null, // null means unlimited usage
+      default: null, // null means unlimited usage, 1 for single-use gift voucher
     },
     usedCount: {
       type: Number,
@@ -58,6 +58,16 @@ const couponSchema = new mongoose.Schema(
     targetProjectTitle: {
       type: String,
       default: 'All Projects',
+      trim: true,
+    },
+    isGiftVoucher: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    notes: {
+      type: String,
+      default: '',
       trim: true,
     },
   },
