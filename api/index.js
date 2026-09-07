@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -11,6 +12,22 @@ if (dns && dns.setServers) {
   try {
     dns.setServers(['8.8.8.8', '8.8.4.4']);
   } catch (_) {}
+}
+
+
+// Device & IP Security Fingerprinting
+function getDeviceFingerprint(userAgent = '') {
+  const normalizedUa = (userAgent || '').trim().toLowerCase();
+  return crypto.createHash('sha256').update(normalizedUa).digest('hex').substring(0, 16);
+}
+
+function normalizeIpAddress(ip = '') {
+  if (!ip) return '';
+  const firstIp = ip.split(',')[0].trim();
+  if (firstIp === '::1' || firstIp === '::ffff:127.0.0.1' || firstIp === 'localhost') {
+    return '127.0.0.1';
+  }
+  return firstIp.replace(/^::ffff:/, '');
 }
 
 const app = express();
@@ -154,6 +171,8 @@ const couponSchema = new mongoose.Schema(
     expiryDate: { type: Date },
     targetProject: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', default: null },
     targetProjectTitle: { type: String, default: 'All Projects' },
+    isGiftVoucher: { type: Boolean, default: false },
+    notes: { type: String, default: '' },
   },
   { timestamps: true }
 );
@@ -222,6 +241,25 @@ const chatMessageSchema = new mongoose.Schema(
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 const Project = mongoose.models.Project || mongoose.model('Project', projectSchema);
 const Order = mongoose.models.Order || mongoose.model('Order', orderSchema);
+
+const downloadLogSchema = new mongoose.Schema(
+  {
+    order: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
+    project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    userEmail: { type: String },
+    clientIp: { type: String, default: '' },
+    deviceHash: { type: String, default: '' },
+    deviceHashes: [{ type: String }],
+    usedTokens: [{ type: String }],
+    downloadCount: { type: Number, default: 0 },
+    maxDownloadsAllowed: { type: Number, default: 5 },
+    lastDownloadedAt: { type: Date, default: Date.now },
+  },
+  { timestamps: true }
+);
+const DownloadLog = mongoose.models.DownloadLog || mongoose.model('DownloadLog', downloadLogSchema);
+
 const Coupon = mongoose.models.Coupon || mongoose.model('Coupon', couponSchema);
 const FlashSale = mongoose.models.FlashSale || mongoose.model('FlashSale', flashSaleSchema);
 const CustomProject = mongoose.models.CustomProject || mongoose.model('CustomProject', customProjectSchema);
@@ -517,28 +555,108 @@ app.get('/api/projects/download-secure', async (req, res) => {
   try {
     const { token } = req.query;
     if (!token) {
-      return res.redirect('https://apexmarketstore.vercel.app/dashboard');
+      return res.status(400).send('<h2>Invalid or missing download token.</h2>');
     }
 
     let decoded = null;
     try {
       decoded = jwt.verify(token, JWT_SECRET);
-    } catch (_) {
-      try {
-        decoded = jwt.decode(token);
-      } catch (_) {}
+    } catch (err) {
+      return res.status(403).send('<h2>Download token has expired or is invalid. Please request a fresh link from your dashboard.</h2>');
     }
 
-    if (decoded && decoded.projectId) {
-      const project = await Project.findById(decoded.projectId);
-      if (project && (project.externalDownloadUrl || project.fileUrl)) {
-        return res.redirect(302, project.externalDownloadUrl || project.fileUrl);
-      }
+    const { projectId, orderId, userId, jti } = decoded;
+    if (!projectId) {
+      return res.status(400).send('<h2>Invalid token payload.</h2>');
     }
 
-    return res.redirect('https://apexmarketstore.vercel.app/dashboard');
-  } catch (_) {
-    return res.redirect('https://apexmarketstore.vercel.app/dashboard');
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).send('<h2>Project not found or removed.</h2>');
+    }
+
+    const currentIp = normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket?.remoteAddress);
+    const currentDevice = getDeviceFingerprint(req.headers['user-agent']);
+
+    let log = await DownloadLog.findOne({
+      $or: [
+        { order: orderId, project: projectId },
+        { user: userId, project: projectId },
+      ],
+    });
+
+    if (!log) {
+      log = new DownloadLog({
+        order: orderId || null,
+        project: projectId,
+        user: userId || null,
+        clientIp: currentIp,
+        deviceHash: currentDevice,
+        deviceHashes: [currentDevice],
+        usedTokens: [],
+        downloadCount: 0,
+        maxDownloadsAllowed: 5,
+      });
+    }
+
+    // 1. One-Time Self-Destruct Token Check
+    if (jti && log.usedTokens && log.usedTokens.includes(jti)) {
+      return res.status(403).send(`
+        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+          <h2 style="color: #ef4444;">🔒 Link Already Used (Self-Destructed)</h2>
+          <p>For your security, download links expire immediately after first use.</p>
+          <p>Please return to your <a href="/dashboard">Dashboard</a> to generate a new link.</p>
+        </div>
+      `);
+    }
+
+    // 2. Strict 5-Download Limit Check
+    if ((log.downloadCount || 0) >= (log.maxDownloadsAllowed || 5)) {
+      return res.status(403).send(`
+        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+          <h2 style="color: #ef4444;">⛔ Download Limit Exceeded (5/5)</h2>
+          <p>You have reached the maximum allowed downloads (5) for this product.</p>
+          <p>Please contact support if you require an emergency re-download.</p>
+        </div>
+      `);
+    }
+
+    // 3. IP & Device Lock Check
+    const hasDeviceBound = log.deviceHash && log.deviceHash.length > 0;
+    const deviceMatches = log.deviceHash === currentDevice || (log.deviceHashes && log.deviceHashes.includes(currentDevice));
+    const ipMatches = !log.clientIp || log.clientIp === currentIp;
+
+    if (hasDeviceBound && !deviceMatches && !ipMatches) {
+      return res.status(403).send(`
+        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
+          <h2 style="color: #ef4444;">🛡️ Device & Network Mismatch</h2>
+          <p>Downloads are securely locked to the device and network used during purchase.</p>
+          <p>Please download using your original browser or device.</p>
+        </div>
+      `);
+    }
+
+    // Burn token & increment counter
+    if (jti) {
+      if (!log.usedTokens) log.usedTokens = [];
+      log.usedTokens.push(jti);
+    }
+    if (!log.clientIp) log.clientIp = currentIp;
+    if (!log.deviceHash) log.deviceHash = currentDevice;
+    if (currentDevice && !log.deviceHashes.includes(currentDevice)) {
+      log.deviceHashes.push(currentDevice);
+    }
+    log.downloadCount = (log.downloadCount || 0) + 1;
+    log.lastDownloadedAt = new Date();
+    await log.save();
+
+    const finalUrl = project.externalDownloadUrl || project.fileUrl;
+    if (finalUrl) {
+      return res.redirect(302, finalUrl);
+    }
+    return res.status(404).send('<h2>Download file URL not configured for this project.</h2>');
+  } catch (err) {
+    return res.status(500).send('<h2>Server error during secure download: ' + err.message + '</h2>');
   }
 });
 
@@ -648,9 +766,6 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
     if (!cleanEmail || !cleanEmail.includes('@')) {
       return res.status(400).json({ success: false, message: 'Valid email required' });
     }
-    if (!cleanUtr) {
-      return res.status(400).json({ success: false, message: 'Valid UPI UTR required' });
-    }
 
     let selectedProjects = [];
     if (Array.isArray(projectIds) && projectIds.length > 0) {
@@ -661,6 +776,26 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
 
     const calculatedTotal = selectedProjects.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
     const invoiceNumber = 'INV-' + Date.now().toString().slice(-6);
+
+    let discountAmount = 0;
+    let appliedCoupon = null;
+    if (couponCode) {
+      const c = await Coupon.findOne({ code: couponCode.trim().toUpperCase(), isActive: true });
+      if (c) {
+        appliedCoupon = c;
+        if (c.discountType === 'percentage') {
+          discountAmount = Math.round((calculatedTotal * c.discountValue) / 100);
+        } else {
+          discountAmount = Math.min(calculatedTotal, c.discountValue);
+        }
+      }
+    }
+    const finalTotal = Math.max(0, calculatedTotal - discountAmount);
+    const isZeroOrder = finalTotal <= 0;
+
+    if (!isZeroOrder && !cleanUtr) {
+      return res.status(400).json({ success: false, message: 'Valid UPI UTR required' });
+    }
 
     const orderItems = selectedProjects.map((p) => ({
       project: p._id || p.id,
@@ -676,12 +811,20 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
       customerPhone: cleanPhone,
       projects: selectedProjects.map((p) => p._id || p.id),
       items: orderItems,
-      totalAmount: calculatedTotal,
-      paymentStatus: 'pending_verification',
-      paymentMethod: 'UPI Direct Transfer',
-      utrNumber: cleanUtr,
+      totalAmount: finalTotal,
+      paymentStatus: isZeroOrder ? 'completed' : 'pending_verification',
+      paymentMethod: isZeroOrder ? 'VIP Gift Voucher (100% Free)' : 'UPI Direct Transfer',
+      utrNumber: isZeroOrder ? (cleanUtr || 'GIFT-FREE-PASS') : cleanUtr,
       invoiceNumber,
     });
+
+    if (appliedCoupon) {
+      appliedCoupon.usedCount = (appliedCoupon.usedCount || 0) + 1;
+      if (appliedCoupon.isGiftVoucher || (appliedCoupon.usageLimit && appliedCoupon.usedCount >= appliedCoupon.usageLimit)) {
+        appliedCoupon.isActive = false;
+      }
+      await appliedCoupon.save();
+    }
 
     // 1. Send immediate confirmation email to customer
     const customerSubmissionHtml = `
@@ -902,44 +1045,58 @@ app.get('/api/orders/my-purchases', authenticate, async (req, res) => {
       paymentStatus: { $in: ['paid', 'completed', 'fulfilled'] },
     }).populate('projects items.project');
 
+    const cleanIp = normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket?.remoteAddress);
+    const deviceHash = getDeviceFingerprint(req.headers['user-agent']);
+
     const purchasesMap = new Map();
-    orders.forEach((order) => {
-      if (Array.isArray(order.items)) {
-        order.items.forEach((item) => {
-          const proj = item.project;
-          if (proj) {
-            const pId = (proj._id || proj.id || proj).toString();
-            if (!purchasesMap.has(pId)) {
-              purchasesMap.set(pId, {
-                _id: pId,
-                project: proj,
-                orderId: order._id,
-                purchaseDate: order.createdAt,
-                downloadUrl: proj.fileUrl || proj.externalDownloadUrl || item.fileUrl || item.externalDownloadUrl || '',
-                invoiceNumber: order.invoiceNumber,
-              });
-            }
+    for (const order of orders) {
+      const itemsList = Array.isArray(order.items) && order.items.length > 0 ? order.items : (order.projects || []).map(p => ({ project: p }));
+      for (const item of itemsList) {
+        const proj = item.project;
+        if (proj) {
+          const pId = (proj._id || proj.id || proj).toString();
+          if (!purchasesMap.has(pId)) {
+            let log = await DownloadLog.findOne({
+              $or: [
+                { order: order._id, project: pId },
+                { user: req.user?._id, project: pId },
+              ],
+            });
+            const downloadCount = log ? (log.downloadCount || 0) : 0;
+            const maxDownloadsAllowed = log ? (log.maxDownloadsAllowed || 5) : 5;
+            const isDownloadExhausted = downloadCount >= maxDownloadsAllowed;
+
+            const jti = crypto.randomBytes(16).toString('hex');
+            const token = jwt.sign(
+              {
+                projectId: pId,
+                orderId: order._id.toString(),
+                userId: (req.user?._id || req.user?.id).toString(),
+                clientIp: cleanIp,
+                deviceHash,
+                jti,
+                purpose: 'digital_download',
+              },
+              JWT_SECRET,
+              { expiresIn: '15m' }
+            );
+
+            purchasesMap.set(pId, {
+              _id: pId,
+              project: proj,
+              orderId: order._id,
+              purchaseDate: order.createdAt,
+              downloadUrl: '/api/projects/download-secure?token=' + token,
+              invoiceNumber: order.invoiceNumber,
+              downloadCount,
+              maxDownloadsAllowed,
+              remainingDownloads: Math.max(0, maxDownloadsAllowed - downloadCount),
+              isDownloadExhausted,
+            });
           }
-        });
+        }
       }
-      if (Array.isArray(order.projects)) {
-        order.projects.forEach((proj) => {
-          if (proj) {
-            const pId = (proj._id || proj.id || proj).toString();
-            if (!purchasesMap.has(pId)) {
-              purchasesMap.set(pId, {
-                _id: pId,
-                project: proj,
-                orderId: order._id,
-                purchaseDate: order.createdAt,
-                downloadUrl: proj.fileUrl || proj.externalDownloadUrl || '',
-                invoiceNumber: order.invoiceNumber,
-              });
-            }
-          }
-        });
-      }
-    });
+    }
 
     const purchases = Array.from(purchasesMap.values());
     res.json({ success: true, count: purchases.length, purchases });
