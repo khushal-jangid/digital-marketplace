@@ -62,8 +62,8 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['gateway', 'qr_code', 'upi', 'free'],
       default: 'gateway',
+      trim: true,
     },
     transactionRef: {
       type: String,
@@ -71,7 +71,23 @@ const orderSchema = new mongoose.Schema(
       trim: true,
       sparse: true,
     },
+    utrNumber: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    invoiceNumber: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     contactEmail: {
+      type: String,
+      default: null,
+      trim: true,
+      lowercase: true,
+    },
+    userEmail: {
       type: String,
       default: null,
       trim: true,
@@ -82,6 +98,17 @@ const orderSchema = new mongoose.Schema(
       default: null,
       trim: true,
     },
+    customerPhone: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    projects: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Project',
+      },
+    ],
     referredByCode: {
       type: String,
       default: null,
