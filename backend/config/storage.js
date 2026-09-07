@@ -14,28 +14,16 @@ if (!fs.existsSync(SECURE_UPLOAD_DIR)) {
 }
 
 /**
- * Generate a consistent short fingerprint for a client device / browser
- * @param {string} userAgent 
- * @returns {string} 16-character hex hash
+ * Device fingerprint disabled per security privacy policy
+ * @returns {string} empty string
  */
-export const getDeviceFingerprint = (userAgent = '') => {
-  const normalizedUa = (userAgent || '').trim().toLowerCase();
-  return crypto.createHash('sha256').update(normalizedUa).digest('hex').substring(0, 16);
-};
+export const getDeviceFingerprint = () => '';
 
 /**
- * Normalize IP addresses (converts IPv6 loopback to 127.0.0.1)
- * @param {string} ip 
- * @returns {string}
+ * IP address tracking disabled per security privacy policy
+ * @returns {string} empty string
  */
-export const normalizeIpAddress = (ip = '') => {
-  if (!ip) return '';
-  const firstIp = ip.split(',')[0].trim();
-  if (firstIp === '::1' || firstIp === '::ffff:127.0.0.1' || firstIp === 'localhost') {
-    return '127.0.0.1';
-  }
-  return firstIp.replace(/^::ffff:/, '');
-};
+export const normalizeIpAddress = () => '';
 
 /**
  * Save file to secure storage with sanitized random filename
@@ -69,14 +57,14 @@ export const saveFileToStorage = async (file) => {
 };
 
 /**
- * Generate a secure, one-time signed download URL with IP and device binding
+ * Generate a secure signed download URL
  * @param {string} fileKey - Secure key of the file
  * @param {string} originalName - Original filename to send in download headers
  * @param {string} userId - User requesting download
  * @param {string} projectId - Project being downloaded
  * @param {string} orderId - Verified purchase order ID
- * @param {string} [clientIp] - Client IP address to bind
- * @param {string} [userAgent] - User agent string to bind
+ * @param {string} [_clientIp] - Unused (IP tracking disabled)
+ * @param {string} [_userAgent] - Unused (Device tracking disabled)
  * @param {string} [host] - Server host URL
  * @returns {string} Secure URL
  */
@@ -86,27 +74,23 @@ export const generateSignedDownloadUrl = (
   userId,
   projectId,
   orderId,
-  clientIp = '',
-  userAgent = '',
+  _clientIp = '',
+  _userAgent = '',
   host = null
 ) => {
-  const cleanIp = normalizeIpAddress(clientIp);
-  const deviceHash = getDeviceFingerprint(userAgent);
   const jti = crypto.randomBytes(16).toString('hex'); // Single-use unique token nonce
 
   const token = signJwt(
     {
       fileKey: path.basename(fileKey || ''),
       originalName: path.basename(originalName || 'download.zip'),
-      userId: userId.toString(),
-      projectId: projectId.toString(),
-      orderId: orderId.toString(),
-      clientIp: cleanIp,
-      deviceHash,
+      userId: (userId || '').toString(),
+      projectId: (projectId || '').toString(),
+      orderId: (orderId || '').toString(),
       jti,
       purpose: 'digital_download',
     },
-    { expiresIn: '15m' } // Token expires in 15 minutes
+    { expiresIn: '24h' }
   );
 
   const serverUrl = host || process.env.SERVER_URL || 'http://localhost:5000';
