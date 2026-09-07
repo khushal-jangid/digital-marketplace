@@ -15,19 +15,13 @@ if (dns && dns.setServers) {
 }
 
 
-// Device & IP Security Fingerprinting
-function getDeviceFingerprint(userAgent = '') {
-  const normalizedUa = (userAgent || '').trim().toLowerCase();
-  return crypto.createHash('sha256').update(normalizedUa).digest('hex').substring(0, 16);
+// Device & IP Security Fingerprinting (Disabled permanently)
+function getDeviceFingerprint() {
+  return '';
 }
 
-function normalizeIpAddress(ip = '') {
-  if (!ip) return '';
-  const firstIp = ip.split(',')[0].trim();
-  if (firstIp === '::1' || firstIp === '::ffff:127.0.0.1' || firstIp === 'localhost') {
-    return '127.0.0.1';
-  }
-  return firstIp.replace(/^::ffff:/, '');
+function normalizeIpAddress() {
+  return '';
 }
 
 const app = express();
@@ -248,9 +242,6 @@ const downloadLogSchema = new mongoose.Schema(
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     userEmail: { type: String },
-    clientIp: { type: String, default: '' },
-    deviceHash: { type: String, default: '' },
-    deviceHashes: [{ type: String }],
     usedTokens: [{ type: String }],
     downloadCount: { type: Number, default: 0 },
     maxDownloadsAllowed: { type: Number, default: 5 },
@@ -590,9 +581,6 @@ app.get('/api/projects/download-secure', async (req, res) => {
         order: orderId || null,
         project: projectId,
         user: userId || null,
-        clientIp: currentIp,
-        deviceHash: currentDevice,
-        deviceHashes: [currentDevice],
         usedTokens: [],
         downloadCount: 0,
         maxDownloadsAllowed: 5,
@@ -621,30 +609,10 @@ app.get('/api/projects/download-secure', async (req, res) => {
       `);
     }
 
-    // 3. IP & Device Lock Check
-    const hasDeviceBound = log.deviceHash && log.deviceHash.length > 0;
-    const deviceMatches = log.deviceHash === currentDevice || (log.deviceHashes && log.deviceHashes.includes(currentDevice));
-    const ipMatches = !log.clientIp || log.clientIp === currentIp;
-
-    if (hasDeviceBound && !deviceMatches && !ipMatches) {
-      return res.status(403).send(`
-        <div style="font-family: sans-serif; text-align: center; padding: 50px;">
-          <h2 style="color: #ef4444;">🛡️ Device & Network Mismatch</h2>
-          <p>Downloads are securely locked to the device and network used during purchase.</p>
-          <p>Please download using your original browser or device.</p>
-        </div>
-      `);
-    }
-
     // Burn token & increment counter
     if (jti) {
       if (!log.usedTokens) log.usedTokens = [];
       log.usedTokens.push(jti);
-    }
-    if (!log.clientIp) log.clientIp = currentIp;
-    if (!log.deviceHash) log.deviceHash = currentDevice;
-    if (currentDevice && !log.deviceHashes.includes(currentDevice)) {
-      log.deviceHashes.push(currentDevice);
     }
     log.downloadCount = (log.downloadCount || 0) + 1;
     log.lastDownloadedAt = new Date();
@@ -872,7 +840,6 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
                 order: newOrder._id,
                 downloadCount: 1,
                 maxDownloadsAllowed: 5,
-                clientIp: cleanIp,
                 lastDownloadedAt: new Date(),
               },
             },
@@ -890,8 +857,6 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
             projectId: pId,
             orderId: newOrder._id.toString(),
             userId: (userId || '').toString(),
-            clientIp: cleanIp,
-            deviceHash,
             jti,
             purpose: 'digital_download',
           },
@@ -1215,9 +1180,7 @@ app.get('/api/orders/my-purchases', authenticate, async (req, res) => {
                 projectId: pId,
                 orderId: order._id.toString(),
                 userId: (req.user?._id || req.user?.id).toString(),
-                clientIp: cleanIp,
-                deviceHash,
-                jti,
+            jti,
                 purpose: 'digital_download',
               },
               JWT_SECRET,
