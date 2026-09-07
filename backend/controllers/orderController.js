@@ -269,7 +269,6 @@ export const createQrOrder = async (req, res) => {
                 order: order._id,
                 downloadCount: 1,
                 maxDownloadsAllowed: 5,
-                clientIp: normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket?.remoteAddress),
                 lastDownloadedAt: new Date(),
               },
             },
