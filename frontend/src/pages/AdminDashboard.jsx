@@ -1607,7 +1607,6 @@ const AdminDashboard = () => {
             </form>
           </div>
         </div>
-        </div>
       )}
 
       {/* Coupons Tab */}
@@ -2163,6 +2162,7 @@ const AdminDashboard = () => {
               </button>
             </form>
           </div>
+        </div>
         </div>
       )}
 
