@@ -390,8 +390,6 @@ export const getDownloadLink = async (req, res) => {
         order: paidOrder._id,
         downloadCount: 0,
         maxDownloadsAllowed: 5,
-        clientIp,
-        deviceHash: getDeviceFingerprint(userAgent),
       });
     }
 
@@ -533,36 +531,7 @@ export const downloadProjectSecure = async (req, res) => {
       }
     }
 
-    // RULE 2: IP & DEVICE LOCK ENFORCEMENT
-    const currentIp = normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket.remoteAddress);
-    const currentUa = req.headers['user-agent'] || '';
-    const currentDeviceHash = getDeviceFingerprint(currentUa);
-
-    // IP check (allowing localhost variations)
-    if (decoded.clientIp && currentIp) {
-      const isLocal = ['127.0.0.1', '::1', 'localhost'].includes(decoded.clientIp) &&
-                      ['127.0.0.1', '::1', 'localhost'].includes(currentIp);
-      if (!isLocal && decoded.clientIp !== currentIp) {
-        return renderSecurityError(
-          res,
-          'IP Address Mismatch',
-          `Security Alert: This download link is locked to the original purchaser network (IP: ${decoded.clientIp}). It cannot be opened or shared across different IP networks.`
-        );
-      }
-    }
-
-    // Device fingerprint check
-    if (decoded.deviceHash && currentDeviceHash) {
-      if (decoded.deviceHash !== currentDeviceHash) {
-        return renderSecurityError(
-          res,
-          'Unauthorized Device Detected',
-          'Security Alert: This download link is locked to the browser and device that requested it. Sharing links between different devices is blocked.'
-        );
-      }
-    }
-
-    // IF ALL CHECKS PASS: RECORD DOWNLOAD AND MARK TOKEN USED
+    // IF CHECKS PASS: RECORD DOWNLOAD AND MARK TOKEN USED
     if (downloadLog) {
       downloadLog.downloadCount = (downloadLog.downloadCount || 0) + 1;
       downloadLog.lastDownloadedAt = new Date();
@@ -572,18 +541,7 @@ export const downloadProjectSecure = async (req, res) => {
         downloadLog.usedTokens.push({
           tokenHash: decoded.jti,
           usedAt: new Date(),
-          ip: currentIp,
-          userAgent: currentUa.substring(0, 200),
         });
-      }
-
-      if (currentIp && !downloadLog.ipAddresses.includes(currentIp)) {
-        downloadLog.ipAddresses.push(currentIp);
-      }
-
-      if (currentDeviceHash && !downloadLog.deviceHashes?.includes(currentDeviceHash)) {
-        if (!downloadLog.deviceHashes) downloadLog.deviceHashes = [];
-        downloadLog.deviceHashes.push(currentDeviceHash);
       }
 
       await downloadLog.save();
