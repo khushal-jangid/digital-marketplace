@@ -175,7 +175,7 @@ const Cart = () => {
         }
         clearCart();
         if (data.isFreeOrder || isFreeOrder) {
-          alert('🎁 Congratulations! Your Gift Voucher was redeemed and project download is unlocked in your dashboard!');
+          alert(`🎁 Congratulations! Your 100% Free Project has been claimed!\n\n✓ Complete source code download link sent to: ${contactEmail.trim()}\n✓ Unlocked on your Dashboard under 'My Purchases'!`);
         } else {
           alert('UTR Submitted Successfully! Once verified by Admin, your download access will be unlocked.');
         }
