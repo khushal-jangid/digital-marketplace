@@ -85,13 +85,7 @@ export const createQrOrder = async (req, res) => {
     const cleanEmail = (contactEmail || '').trim().toLowerCase();
     const cleanPhone = (contactPhone || '').trim();
 
-    if (!cleanUtr || cleanUtr.length < 6) {
-      return res.status(400).json({
-        success: false,
-        code: 'INVALID_UTR',
-        message: 'Please enter a valid 12-digit numeric UPI UTR Transaction Reference Number.',
-      });
-    }
+// UTR check deferred until final totalAmount is calculated
 
     if (!cleanEmail || !cleanEmail.includes('@')) {
       return res.status(400).json({
@@ -219,16 +213,29 @@ export const createQrOrder = async (req, res) => {
       totalAmount += setupAssistanceFee;
     }
 
-    // 4. Create Order in MongoDB
+    // 4. Validate UTR only if order is not 100% free via Gift Voucher
+    const isFreeOrder = (totalAmount === 0);
+
+    if (!isFreeOrder) {
+      if (!cleanUtr || cleanUtr.length < 6) {
+        return res.status(400).json({
+          success: false,
+          code: 'INVALID_UTR',
+          message: 'Please enter a valid 12-digit numeric UPI UTR Transaction Reference Number.',
+        });
+      }
+    }
+
+    // 5. Create Order in MongoDB
     const order = await Order.create({
       user: userId,
       items: orderItems,
       totalAmount,
       discountAmount,
       couponApplied: validCouponCode,
-      paymentStatus: 'pending_verification',
-      paymentMethod: 'qr_code',
-      transactionRef: cleanUtr,
+      paymentStatus: isFreeOrder ? 'paid' : 'pending_verification',
+      paymentMethod: isFreeOrder ? 'gift_voucher' : 'qr_code',
+      transactionRef: isFreeOrder ? (cleanUtr || `GIFT-${validCouponCode || 'FREE'}-${Date.now()}`) : cleanUtr,
       contactEmail: cleanEmail,
       contactPhone: cleanPhone,
       referredByCode: referredByCode ? referredByCode.trim().toUpperCase() : null,
@@ -236,15 +243,70 @@ export const createQrOrder = async (req, res) => {
       setupAssistancePrice: setupAssistanceFee,
     });
 
-    console.log(`[Order Submitted] ID: ${order._id}, Total: ₹${totalAmount}, UTR: ${cleanUtr}, Email: ${cleanEmail}`);
+    console.log(`[Order Created] ID: ${order._id}, Total: ₹${totalAmount}, Status: ${order.paymentStatus}`);
 
-    // 5. Send Telegram notification to Admin
+    // Handle 100% FREE Gift Voucher Order immediately
+    if (isFreeOrder) {
+      if (validCouponCode) {
+        await couponService.redeemCoupon(validCouponCode).catch(() => {});
+      }
+
+      for (const p of projects) {
+        p.downloadCount = (p.downloadCount || 0) + 1;
+        await p.save().catch(() => {});
+      }
+
+      const hostUrl = `${req.protocol}://${req.get('host')}`;
+      const downloadLinks = projects.map((p) => ({
+        title: p.title,
+        downloadUrl: generateSignedDownloadUrl(
+          p.fileKey || '',
+          p.fileName || `${p.title}.zip`,
+          userId.toString(),
+          p._id.toString(),
+          order._id.toString(),
+          normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket.remoteAddress),
+          req.headers['user-agent'] || '',
+          hostUrl
+        ),
+      }));
+
+      sendPurchaseEmail(cleanEmail, authUser?.name || cleanEmail.split('@')[0], order, downloadLinks).catch((err) => {
+        console.warn('[VOUCHER EMAIL ERROR]:', err.message);
+      });
+
+      const projectTitles = projects.map((p) => p.title).join(', ');
+      const tgText = `🎁 <b>100% FREE GIFT VOUCHER REDEEMED!</b>\n\n` +
+        `👤 <b>Customer:</b> ${cleanEmail} (📞 ${cleanPhone || 'N/A'})\n` +
+        `📦 <b>Project(s):</b> ${projectTitles}\n` +
+        `🎟️ <b>Voucher Code:</b> <code>${validCouponCode}</code>\n` +
+        `⚡ <b>Status:</b> Instantly Approved & Download Unlocked!`;
+
+      sendTelegramMessage(tgText).catch(() => {});
+
+      return res.status(201).json({
+        success: true,
+        isFreeOrder: true,
+        message: '🎁 Gift Voucher Redeemed Successfully! Your download access is unlocked instantly.',
+        orderId: order._id,
+        token: autoToken,
+        user: authUser ? {
+          _id: authUser._id,
+          name: authUser.name,
+          email: authUser.email,
+          role: authUser.role,
+        } : null,
+        order,
+      });
+    }
+
+    // 6. Normal Paid Order: Notify Admin for manual UTR verification
     const projectTitles = projects.map((p) => p.title).join(', ');
-    const tgText = `🛒 <b>NEW ORDER PAYMENT (UTR) RECEIVED!</b>\\n\\n` +
-      `👤 <b>Customer:</b> ${cleanEmail} (📞 ${cleanPhone || 'N/A'})\\n` +
-      `📦 <b>Project(s):</b> ${projectTitles}\\n` +
-      `💰 <b>Amount:</b> INR ${totalAmount}\\n` +
-      `💳 <b>UTR Reference:</b> <code>${cleanUtr}</code>\\n\\n` +
+    const tgText = `🛒 <b>NEW ORDER PAYMENT (UTR) RECEIVED!</b>\n\n` +
+      `👤 <b>Customer:</b> ${cleanEmail} (📞 ${cleanPhone || 'N/A'})\n` +
+      `📦 <b>Project(s):</b> ${projectTitles}\n` +
+      `💰 <b>Amount:</b> INR ${totalAmount}\n` +
+      `💳 <b>UTR Reference:</b> <code>${cleanUtr}</code>\n\n` +
       `⚡ Click <b>Approve</b> below to immediately unlock download access for this customer:`;
 
     const replyMarkup = {
@@ -253,13 +315,13 @@ export const createQrOrder = async (req, res) => {
           { text: '✅ Approve & Unlock Download', callback_data: `approve_${order._id}` },
           { text: '❌ Reject Order', callback_data: `reject_${order._id}` }
         ],
-        ...(cleanPhone ? [[{ text: '💬 WhatsApp Customer', url: `https://wa.me/91${cleanPhone.replace(/\\D/g, '')}?text=Hi,%20I%20received%20your%20payment%20for%20${encodeURIComponent(projectTitles)}.` }]] : [])
+        ...(cleanPhone ? [[{ text: '💬 WhatsApp Customer', url: `https://wa.me/91${cleanPhone.replace(/\D/g, '')}?text=Hi,%20I%20received%20your%20payment%20for%20${encodeURIComponent(projectTitles)}.` }]] : [])
       ]
     };
 
     sendTelegramMessage(tgText, replyMarkup).catch(() => {});
 
-    // Send instant confirmation email to customer that order is submitted & pending verification
+        // Send instant confirmation email to customer that order is submitted & pending verification
     sendOrderPendingEmail(cleanEmail, authUser?.name || cleanEmail.split('@')[0], order, cleanUtr, projects).catch((err) => {
       console.warn('[ORDER PENDING EMAIL NOTICE]:', err.message);
     });
