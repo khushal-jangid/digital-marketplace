@@ -132,7 +132,8 @@ const UserDashboard = () => {
       // 2. Fetch user download logs
       const downloadsData = await request('/orders/download-history', 'GET');
       if (downloadsData && downloadsData.success) {
-        setDownloads(Array.isArray(downloadsData.history) ? downloadsData.history : []);
+        const list = Array.isArray(downloadsData.history) ? downloadsData.history : (downloadsData.logs || []);
+        setDownloads(list);
       } else {
         setDownloads([]);
       }
@@ -173,6 +174,7 @@ const UserDashboard = () => {
     try {
       const data = await request(`/projects/${projectId}/download-link`, 'GET');
       if (data.success && data.downloadUrl) {
+        setTimeout(() => fetchDashboardData(), 1500);
         const link = document.createElement('a');
         link.href = data.downloadUrl;
         link.setAttribute('target', '_blank');
@@ -182,6 +184,7 @@ const UserDashboard = () => {
       }
     } catch (error) {
       alert(error.message || 'Download link generation failed');
+      fetchDashboardData();
     }
   };
 
@@ -412,13 +415,37 @@ const UserDashboard = () => {
 
                             {pur.project?._id ? (
                               <>
-                                <button
-                                  onClick={() => handleDownload(pur.project._id)}
-                                  className="btn btn-primary"
-                                  style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                >
-                                  <DownloadCloud size={14} /> Download File
-                                </button>
+                                {pur.isDownloadExhausted || (pur.downloadCount >= (pur.maxDownloadsAllowed || 5)) ? (
+                                  <button
+                                    disabled
+                                    className="btn"
+                                    style={{
+                                      padding: '8px 14px',
+                                      fontSize: '12.5px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      background: 'rgba(239, 68, 68, 0.12)',
+                                      color: '#f87171',
+                                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                                      cursor: 'not-allowed',
+                                      opacity: 0.85,
+                                      fontWeight: 600,
+                                    }}
+                                    title="Maximum 5 downloads completed. Access is locked."
+                                  >
+                                    🔒 Limit Reached (5/5)
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleDownload(pur.project._id)}
+                                    className="btn btn-primary"
+                                    style={{ padding: '8px 16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    title={`Downloads used: ${pur.downloadCount || 0} of ${pur.maxDownloadsAllowed || 5}`}
+                                  >
+                                    <DownloadCloud size={14} /> Download File (${pur.downloadCount || 0}/${pur.maxDownloadsAllowed || 5})
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => navigate(`/projects/${pur.project._id}`)}
                                   className="btn btn-secondary"
