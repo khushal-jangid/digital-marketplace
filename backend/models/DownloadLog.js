@@ -27,28 +27,8 @@ const downloadLogSchema = new mongoose.Schema(
     },
     maxDownloadsAllowed: {
       type: Number,
-      default: 5, // Strict limit of 5 downloads per purchase
+      default: 5,
     },
-    // Locked IP address and device fingerprint of the initial purchaser
-    clientIp: {
-      type: String,
-      default: '',
-    },
-    deviceHash: {
-      type: String,
-      default: '',
-    },
-    ipAddresses: [
-      {
-        type: String,
-      },
-    ],
-    deviceHashes: [
-      {
-        type: String,
-      },
-    ],
-    // One-time self-destruct tokens tracking
     usedTokens: [
       {
         tokenHash: {
@@ -59,8 +39,6 @@ const downloadLogSchema = new mongoose.Schema(
           type: Date,
           default: Date.now,
         },
-        ip: String,
-        userAgent: String,
       },
     ],
     lastDownloadedAt: {
@@ -73,7 +51,6 @@ const downloadLogSchema = new mongoose.Schema(
   }
 );
 
-// Prevent duplicate log tracking records per user-project-order tuple
 downloadLogSchema.index({ user: 1, project: 1, order: 1 }, { unique: true });
 
 const DownloadLog = mongoose.model('DownloadLog', downloadLogSchema);
