@@ -27,11 +27,40 @@ const downloadLogSchema = new mongoose.Schema(
     },
     maxDownloadsAllowed: {
       type: Number,
-      default: 5, // Limit downloads to 5 times per purchase
+      default: 5, // Strict limit of 5 downloads per purchase
+    },
+    // Locked IP address and device fingerprint of the initial purchaser
+    clientIp: {
+      type: String,
+      default: '',
+    },
+    deviceHash: {
+      type: String,
+      default: '',
     },
     ipAddresses: [
       {
         type: String,
+      },
+    ],
+    deviceHashes: [
+      {
+        type: String,
+      },
+    ],
+    // One-time self-destruct tokens tracking
+    usedTokens: [
+      {
+        tokenHash: {
+          type: String,
+          required: true,
+        },
+        usedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        ip: String,
+        userAgent: String,
       },
     ],
     lastDownloadedAt: {
