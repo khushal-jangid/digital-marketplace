@@ -804,13 +804,16 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
     const newOrder = await Order.create({
       user: userId,
       userEmail: cleanEmail,
+      contactEmail: cleanEmail,
       customerPhone: cleanPhone,
+      contactPhone: cleanPhone,
       projects: selectedProjects.map((p) => p._id || p.id),
       items: orderItems,
       totalAmount: finalTotal,
       paymentStatus: isZeroOrder ? 'paid' : 'pending_verification',
       paymentMethod: isZeroOrder ? 'VIP Gift Voucher (100% Free)' : 'UPI Direct Transfer',
       utrNumber: isZeroOrder ? (cleanUtr || 'GIFT-FREE-PASS') : cleanUtr,
+      transactionRef: isZeroOrder ? (cleanUtr || 'GIFT-FREE-PASS') : cleanUtr,
       invoiceNumber,
     });
 
