@@ -125,8 +125,10 @@ const Cart = () => {
       setUtrError('Please enter a valid 10-digit phone number.');
       return;
     }
-    if (!isFreeOrder && (!utrNumber || utrNumber.trim().length !== 12 || isNaN(utrNumber))) {
-      setUtrError('Please enter a valid 12-digit numeric UTR/Reference Number.');
+
+    const sanitizedUtr = (utrNumber || '').replace(/\s+/g, '').trim();
+    if (!isFreeOrder && sanitizedUtr.length < 6) {
+      setUtrError('Please enter a valid 12-digit UPI Ref / UTR Number.');
       return;
     }
 
@@ -137,14 +139,14 @@ const Cart = () => {
       const data = await request('/orders/qr-checkout', 'POST', {
         projectIds,
         couponCode: coupon?.code,
-        transactionRef: isFreeOrder ? 'FREE_GIFT_VOUCHER' : utrNumber.trim(),
+        transactionRef: isFreeOrder ? 'FREE_GIFT_VOUCHER' : sanitizedUtr,
+        utrNumber: isFreeOrder ? 'FREE_GIFT_VOUCHER' : sanitizedUtr,
         contactEmail: contactEmail.trim(),
         contactPhone: contactPhone.trim(),
         referredByCode: refCode || null,
-        
       });
 
-      if (data.success) {
+      if (data && data.success) {
         if (data.token) {
           localStorage.setItem('token', data.token);
           if (loadProfile) {
@@ -153,17 +155,19 @@ const Cart = () => {
         }
         clearCart();
         if (data.isFreeOrder || isFreeOrder) {
-          alert(`🎁 Congratulations! Your 100% Free Project has been claimed!\n\n✓ Complete source code download link sent to: ${contactEmail.trim()}\n✓ Unlocked on your Dashboard under 'My Purchases'!`);
-          if (data.downloadLinks && data.downloadLinks[0] && data.downloadLinks[0].directUrl) {
+          alert(`🎁 Congratulations! Your project is ready!\n\n✓ ${data.message || 'Unlocked on your Dashboard'}\n✓ Download link sent to: ${contactEmail.trim()}`);
+          if (data.downloadLinks && data.downloadLinks[0] && (data.downloadLinks[0].directUrl || data.downloadLinks[0].downloadUrl)) {
             try {
-              window.open(data.downloadLinks[0].directUrl, '_blank');
+              window.open(data.downloadLinks[0].directUrl || data.downloadLinks[0].downloadUrl, '_blank');
             } catch (_) {}
           }
         } else {
-          alert('UTR Submitted Successfully! Once verified by Admin, your download access will be unlocked.');
+          alert('✅ UTR Submitted Successfully!\n\nYour payment reference has been submitted. Once verified by Admin, your download access will be unlocked on your Dashboard.');
         }
         setShowQrModal(false);
         navigate('/dashboard');
+      } else {
+        setUtrError(data?.message || 'Verification submission failed. Please check your details.');
       }
     } catch (error) {
       setUtrError(error.message || 'Verification submission failed');
