@@ -147,15 +147,7 @@ export const createQrOrder = async (req, res) => {
       });
     }
 
-    // Check already owned
-    const alreadyOwnedTitle = await checkAlreadyOwnedProjects(userId, uniqueIds);
-    if (alreadyOwnedTitle) {
-      return res.status(400).json({
-        success: false,
-        code: 'ALREADY_OWNED',
-        message: `You already own "${alreadyOwnedTitle}". You can download it directly from your dashboard.`,
-      });
-    }
+    // Already-owned check deferred to free voucher handling
 
     // Fetch projects from MongoDB
     const validObjectIds = uniqueIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
@@ -216,12 +208,45 @@ export const createQrOrder = async (req, res) => {
     // 4. Validate UTR only if order is not 100% free via Gift Voucher
     const isFreeOrder = (totalAmount === 0);
 
+    // If order is free and customer already claimed/purchased this project, return 200 gracefully
+    const alreadyOwnedTitle = await checkAlreadyOwnedProjects(userId, uniqueIds);
+    if (isFreeOrder && alreadyOwnedTitle) {
+      const hostUrl = `${req.protocol}://${req.get('host')}`;
+      const downloadLinks = projects.map((p) => {
+        const signedUrl = generateSignedDownloadUrl(
+          p.fileKey || '',
+          p.fileName || `${p.title}.zip`,
+          userId ? userId.toString() : '',
+          p._id.toString(),
+          'ALREADY_OWNED',
+          '',
+          '',
+          hostUrl
+        );
+        return {
+          title: p.title,
+          downloadUrl: signedUrl,
+          directUrl: p.externalDownloadUrl || p.fileUrl || signedUrl,
+        };
+      });
+
+      return res.status(200).json({
+        success: true,
+        isFreeOrder: true,
+        alreadyOwned: true,
+        message: `You already own "${alreadyOwnedTitle}". Your download access is unlocked on your dashboard.`,
+        downloadLinks,
+        token: autoToken,
+      });
+    }
+
     if (!isFreeOrder) {
-      if (!cleanUtr || cleanUtr.length < 6) {
+      const sanitizedUtr = cleanUtr.replace(/\s+/g, '');
+      if (!sanitizedUtr || sanitizedUtr.length < 6) {
         return res.status(400).json({
           success: false,
           code: 'INVALID_UTR',
-          message: 'Please enter a valid 12-digit numeric UPI UTR Transaction Reference Number.',
+          message: 'Please enter a valid 12-digit UPI UTR Transaction Reference Number.',
         });
       }
     }
@@ -236,6 +261,7 @@ export const createQrOrder = async (req, res) => {
       paymentStatus: isFreeOrder ? 'paid' : 'pending_verification',
       paymentMethod: isFreeOrder ? 'gift_voucher' : 'qr_code',
       transactionRef: isFreeOrder ? (cleanUtr || `GIFT-${validCouponCode || 'FREE'}-${Date.now()}`) : cleanUtr,
+      utrNumber: cleanUtr,
       contactEmail: cleanEmail,
       userEmail: cleanEmail,
       contactPhone: cleanPhone,
