@@ -41,29 +41,7 @@ const Cart = () => {
   const [qrSubmitLoading, setQrSubmitLoading] = useState(false);
   const [utrError, setUtrError] = useState('');
 
-  // Setup Assistance Add-on State
-  const [includeSetupAssistance, setIncludeSetupAssistance] = useState(false);
-  const [setupAssistancePrice, setSetupAssistancePrice] = useState(199);
-  const [setupAssistanceEnabled, setSetupAssistanceEnabled] = useState(true);
-  const [setupAssistanceTitle, setSetupAssistanceTitle] = useState('1-on-1 Remote Setup Help (AnyDesk / Google Meet)');
-  const [setupAssistanceDesc, setSetupAssistanceDesc] = useState('Skip the hassle of .env config, database connections, and running commands. We will remotely set up and run the code on your laptop!');
-
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const res = await request('/settings/public');
-        if (res?.success && res.settings) {
-          if (res.settings.setupAssistancePrice !== undefined) setSetupAssistancePrice(Number(res.settings.setupAssistancePrice));
-          if (res.settings.setupAssistanceEnabled !== undefined) setSetupAssistanceEnabled(Boolean(res.settings.setupAssistanceEnabled));
-          if (res.settings.setupAssistanceTitle) setSetupAssistanceTitle(res.settings.setupAssistanceTitle);
-          if (res.settings.setupAssistanceDesc) setSetupAssistanceDesc(res.settings.setupAssistanceDesc);
-        }
-      } catch (_) {}
-    };
-    fetchSettings();
-  }, []);
-
-  const finalTotal = Math.max(0, total + (includeSetupAssistance && setupAssistanceEnabled ? setupAssistancePrice : 0));
+  const finalTotal = Math.max(0, total);
 
   const navigate = useNavigate();
 
@@ -163,7 +141,7 @@ const Cart = () => {
         contactEmail: contactEmail.trim(),
         contactPhone: contactPhone.trim(),
         referredByCode: refCode || null,
-        includeSetupAssistance: includeSetupAssistance && setupAssistanceEnabled,
+        
       });
 
       if (data.success) {
@@ -304,58 +282,13 @@ const Cart = () => {
                 </div>
               )}
 
-              {includeSetupAssistance && setupAssistanceEnabled && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--primary)', fontWeight: 600 }}>
-                  <span>1-on-1 Remote Setup Help</span>
-                  <span>+ {formatPrice(setupAssistancePrice)}</span>
-                </div>
-              )}
+              
               
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '16px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
                 <span>Total Amount</span>
                 <span>{formatPrice(finalTotal)}</span>
               </div>
             </div>
-
-            {/* Setup Assistance Add-on Checkbox */}
-            {setupAssistanceEnabled && (
-              <div
-                onClick={() => setIncludeSetupAssistance(!includeSetupAssistance)}
-                style={{
-                  background: includeSetupAssistance ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-tertiary)',
-                  border: includeSetupAssistance ? '1.5px solid var(--primary)' : '1px dashed var(--border)',
-                  borderRadius: '10px',
-                  padding: '12px 14px',
-                  marginBottom: '16px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  userSelect: 'none',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <input
-                    type="checkbox"
-                    checked={includeSetupAssistance}
-                    onChange={(e) => setIncludeSetupAssistance(e.target.checked)}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ marginTop: '2px', accentColor: 'var(--primary)', cursor: 'pointer', width: '16px', height: '16px' }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
-                        🛠️ {setupAssistanceTitle}
-                      </strong>
-                      <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--primary)' }}>
-                        +{formatPrice(setupAssistancePrice)}
-                      </span>
-                    </div>
-                    <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: '4px 0 0 0', lineHeight: 1.4 }}>
-                      {setupAssistanceDesc}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Promo coupon input */}
             {coupon ? (
