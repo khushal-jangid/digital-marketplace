@@ -341,15 +341,23 @@ export const getLatestActiveCoupon = async (req, res) => {
   try {
     if (!isDbConnected()) {
       const activeCoupons = mockDb.coupons.filter(
-        (c) => c.isActive && !c.isGiftVoucher && new Date() <= new Date(c.expiryDate)
+        (c) =>
+          c.isActive &&
+          !c.isGiftVoucher &&
+          c.discountValue < 100 &&
+          !c.code.toUpperCase().startsWith('GIFT-') &&
+          new Date() <= new Date(c.expiryDate)
       );
       const latest = activeCoupons.length > 0 ? activeCoupons[activeCoupons.length - 1] : null;
       return res.json({ success: true, coupon: latest });
     }
 
+    // Strict Filter: Never expose private 100% free gift vouchers on public banners
     const latest = await Coupon.findOne({
       isActive: true,
-      isGiftVoucher: { $ne: true }, // Exclude private gift vouchers from public banner
+      isGiftVoucher: { $ne: true },
+      discountValue: { $lt: 100 },
+      code: { $not: /^GIFT-/i },
       expiryDate: { $gt: new Date() },
     }).sort({ createdAt: -1 });
 
