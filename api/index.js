@@ -1493,6 +1493,8 @@ app.get('/api/coupons/latest-active', async (req, res) => {
   try {
     const latest = await Coupon.findOne({
       isActive: true,
+      isGiftVoucher: { $ne: true },
+      discountValue: { $lt: 100 },
       code: { $not: /^FLASH/i },
       $or: [{ expiryDate: null }, { expiryDate: { $gt: new Date() } }],
     }).sort({ createdAt: -1 });
