@@ -3,7 +3,14 @@ import Project from '../models/Project.js';
 import Order from '../models/Order.js';
 import Subscriber from '../models/Subscriber.js';
 import User from '../models/User.js';
-import { saveFileToStorage, getSecureFilePath } from '../config/storage.js';
+import DownloadLog from '../models/DownloadLog.js';
+import {
+  saveFileToStorage,
+  getSecureFilePath,
+  generateSignedDownloadUrl,
+  getDeviceFingerprint,
+  normalizeIpAddress,
+} from '../config/storage.js';
 import { sendNewProjectEmail } from '../config/mail.js';
 import { verifyJwt, signJwt } from '../config/jwt.js';
 
@@ -337,7 +344,7 @@ export const addProjectVersion = async (req, res) => {
 };
 
 /**
- * @desc    Get secure download link for purchased project
+ * @desc    Get secure download link for purchased project with device/IP binding
  * @route   GET /api/projects/:id/download-link
  * @access  Private
  */
@@ -365,11 +372,60 @@ export const getDownloadLink = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Project not found' });
     }
 
-    const directUrl = project.fileUrl || project.externalDownloadUrl;
+    const clientIp = normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket.remoteAddress);
+    const userAgent = req.headers['user-agent'] || '';
+    const hostUrl = `${req.protocol}://${req.get('host')}`;
+
+    // Find or initialize DownloadLog record
+    let downloadLog = await DownloadLog.findOne({
+      user: userId,
+      project: projectId,
+      order: paidOrder._id,
+    });
+
+    if (!downloadLog) {
+      downloadLog = await DownloadLog.create({
+        user: userId,
+        project: projectId,
+        order: paidOrder._id,
+        downloadCount: 0,
+        maxDownloadsAllowed: 5,
+        clientIp,
+        deviceHash: getDeviceFingerprint(userAgent),
+      });
+    }
+
+    // STRICT 5-DOWNLOADS CAP CHECK
+    if (downloadLog.downloadCount >= downloadLog.maxDownloadsAllowed) {
+      return res.status(403).json({
+        success: false,
+        code: 'DOWNLOAD_LIMIT_EXCEEDED',
+        message: `Download limit reached (${downloadLog.downloadCount}/${downloadLog.maxDownloadsAllowed}). You have used all 5 allowed downloads for this purchase.`,
+        downloadCount: downloadLog.downloadCount,
+        maxDownloadsAllowed: downloadLog.maxDownloadsAllowed,
+        remainingDownloads: 0,
+      });
+    }
+
+    // Generate single-use signed download token bound to IP and Device
+    const downloadUrl = generateSignedDownloadUrl(
+      project.fileKey || '',
+      project.fileName || `${project.title}.zip`,
+      userId.toString(),
+      projectId.toString(),
+      paidOrder._id.toString(),
+      clientIp,
+      userAgent,
+      hostUrl
+    );
+
     return res.json({
       success: true,
-      downloadUrl: directUrl || 'https://drive.google.com',
+      downloadUrl,
       fileName: project.fileName || `${project.title}.zip`,
+      downloadCount: downloadLog.downloadCount,
+      maxDownloadsAllowed: downloadLog.maxDownloadsAllowed,
+      remainingDownloads: Math.max(0, downloadLog.maxDownloadsAllowed - downloadLog.downloadCount),
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -377,7 +433,42 @@ export const getDownloadLink = async (req, res) => {
 };
 
 /**
- * @desc    Download project securely
+ * Helper to render clean HTML security warning page if browser navigates directly
+ */
+const renderSecurityError = (res, title, message, code = 403) => {
+  return res.status(code).send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${title} - ApexMarket Security</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f3f4f6; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .card { background: #111827; border: 1px solid #374151; border-radius: 16px; padding: 36px 28px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6); }
+        .icon { font-size: 44px; margin-bottom: 12px; }
+        .badge { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; margin-bottom: 16px; }
+        h1 { font-size: 20px; color: #ffffff; margin: 0 0 10px 0; font-weight: 700; }
+        p { font-size: 13.5px; color: #9ca3af; line-height: 1.6; margin: 0 0 24px 0; }
+        .btn { display: inline-block; background: #6366f1; color: white; text-decoration: none; padding: 10px 22px; border-radius: 8px; font-weight: 600; font-size: 13px; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.9; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="icon">🛡️</div>
+        <div class="badge">Security Protection Active</div>
+        <h1>${title}</h1>
+        <p>${message}</p>
+        <a href="https://apexmarketstore.vercel.app/dashboard" class="btn">Return to My Dashboard</a>
+      </div>
+    </body>
+    </html>
+  `);
+};
+
+/**
+ * @desc    Download project securely with one-time token, IP lock, device lock, and 5-download limit
  * @route   GET /api/projects/download-secure
  * @access  Public (Token verified)
  */
@@ -385,39 +476,140 @@ export const downloadProjectSecure = async (req, res) => {
   try {
     const { token } = req.query;
     if (!token) {
-      return res.redirect('https://apexmarketstore.vercel.app/dashboard');
+      return renderSecurityError(res, 'Download Token Missing', 'No valid download token was provided in the request.', 400);
     }
 
     let decoded = null;
     try {
       decoded = verifyJwt(token);
-    } catch (_) {
-      try {
-        const jwt = (await import('jsonwebtoken')).default;
-        decoded = jwt.decode(token);
-      } catch (_) {}
+    } catch (jwtErr) {
+      return renderSecurityError(
+        res,
+        'Link Expired or Invalid',
+        'This download link has expired (15-minute window) or is invalid. Please visit your account dashboard to generate a fresh download link.',
+        403
+      );
     }
 
-    if (decoded && decoded.projectId) {
+    if (!decoded || !decoded.userId || !decoded.projectId) {
+      return renderSecurityError(res, 'Invalid Token Payload', 'The download signature token is malformed or unauthorized.', 400);
+    }
+
+    // 1. Fetch or create DownloadLog record
+    let downloadLog = await DownloadLog.findOne({
+      user: decoded.userId,
+      project: decoded.projectId,
+      ...(decoded.orderId ? { order: decoded.orderId } : {}),
+    });
+
+    if (!downloadLog && decoded.orderId) {
+      downloadLog = await DownloadLog.create({
+        user: decoded.userId,
+        project: decoded.projectId,
+        order: decoded.orderId,
+        downloadCount: 0,
+        maxDownloadsAllowed: 5,
+      });
+    }
+
+    // RULE 3: STRICT 5-DOWNLOADS COUNTER ENFORCEMENT
+    if (downloadLog && downloadLog.downloadCount >= downloadLog.maxDownloadsAllowed) {
+      return renderSecurityError(
+        res,
+        'Download Limit Exceeded (5/5)',
+        `You have already completed the maximum allowed downloads (${downloadLog.maxDownloadsAllowed} times) for this project purchase. Please contact support if you require assistance.`
+      );
+    }
+
+    // RULE 1: ONE-TIME SELF-DESTRUCT TOKEN ENFORCEMENT
+    if (decoded.jti && downloadLog) {
+      const isAlreadyUsed = downloadLog.usedTokens?.some((t) => t.tokenHash === decoded.jti);
+      if (isAlreadyUsed) {
+        return renderSecurityError(
+          res,
+          'Link Already Used',
+          'This download link was already used and has self-destructed for security. Each link is single-use only. Please generate a fresh link from your dashboard if you have downloads remaining.'
+        );
+      }
+    }
+
+    // RULE 2: IP & DEVICE LOCK ENFORCEMENT
+    const currentIp = normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket.remoteAddress);
+    const currentUa = req.headers['user-agent'] || '';
+    const currentDeviceHash = getDeviceFingerprint(currentUa);
+
+    // IP check (allowing localhost variations)
+    if (decoded.clientIp && currentIp) {
+      const isLocal = ['127.0.0.1', '::1', 'localhost'].includes(decoded.clientIp) &&
+                      ['127.0.0.1', '::1', 'localhost'].includes(currentIp);
+      if (!isLocal && decoded.clientIp !== currentIp) {
+        return renderSecurityError(
+          res,
+          'IP Address Mismatch',
+          `Security Alert: This download link is locked to the original purchaser network (IP: ${decoded.clientIp}). It cannot be opened or shared across different IP networks.`
+        );
+      }
+    }
+
+    // Device fingerprint check
+    if (decoded.deviceHash && currentDeviceHash) {
+      if (decoded.deviceHash !== currentDeviceHash) {
+        return renderSecurityError(
+          res,
+          'Unauthorized Device Detected',
+          'Security Alert: This download link is locked to the browser and device that requested it. Sharing links between different devices is blocked.'
+        );
+      }
+    }
+
+    // IF ALL CHECKS PASS: RECORD DOWNLOAD AND MARK TOKEN USED
+    if (downloadLog) {
+      downloadLog.downloadCount = (downloadLog.downloadCount || 0) + 1;
+      downloadLog.lastDownloadedAt = new Date();
+
+      if (decoded.jti) {
+        if (!downloadLog.usedTokens) downloadLog.usedTokens = [];
+        downloadLog.usedTokens.push({
+          tokenHash: decoded.jti,
+          usedAt: new Date(),
+          ip: currentIp,
+          userAgent: currentUa.substring(0, 200),
+        });
+      }
+
+      if (currentIp && !downloadLog.ipAddresses.includes(currentIp)) {
+        downloadLog.ipAddresses.push(currentIp);
+      }
+
+      if (currentDeviceHash && !downloadLog.deviceHashes?.includes(currentDeviceHash)) {
+        if (!downloadLog.deviceHashes) downloadLog.deviceHashes = [];
+        downloadLog.deviceHashes.push(currentDeviceHash);
+      }
+
+      await downloadLog.save();
+    }
+
+    // Serve file securely
+    if (decoded.fileKey) {
+      const filePath = getSecureFilePath(decoded.fileKey);
+      const fs = (await import('fs')).default;
+      if (fs.existsSync(filePath)) {
+        return res.download(filePath, decoded.fileName || 'download.zip');
+      }
+    }
+
+    // Fallback: If external URL is configured
+    if (decoded.projectId) {
       const project = await Project.findById(decoded.projectId);
       if (project && (project.externalDownloadUrl || project.fileUrl)) {
         return res.redirect(302, project.externalDownloadUrl || project.fileUrl);
       }
     }
 
-    if (decoded && decoded.fileKey) {
-      try {
-        const filePath = getSecureFilePath(decoded.fileKey);
-        const fs = (await import('fs')).default;
-        if (fs.existsSync(filePath)) {
-          return res.download(filePath, decoded.fileName || 'download.zip');
-        }
-      } catch (_) {}
-    }
-
-    return res.redirect('https://apexmarketstore.vercel.app/dashboard');
+    return renderSecurityError(res, 'File Not Found', 'The requested file could not be located in secure storage.', 404);
   } catch (error) {
-    return res.redirect('https://apexmarketstore.vercel.app/dashboard');
+    console.error('Secure download execution error:', error);
+    return renderSecurityError(res, 'Server Error', 'An unexpected error occurred during file download. Please try again.', 500);
   }
 };
 
