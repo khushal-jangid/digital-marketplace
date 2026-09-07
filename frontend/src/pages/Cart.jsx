@@ -146,7 +146,8 @@ const Cart = () => {
       setUtrError('Please enter a valid 10-digit phone number.');
       return;
     }
-    if (!utrNumber || utrNumber.trim().length !== 12 || isNaN(utrNumber)) {
+    const isFreeOrder = (finalTotal === 0);
+    if (!isFreeOrder && (!utrNumber || utrNumber.trim().length !== 12 || isNaN(utrNumber))) {
       setUtrError('Please enter a valid 12-digit numeric UTR/Reference Number.');
       return;
     }
@@ -158,7 +159,7 @@ const Cart = () => {
       const data = await request('/orders/qr-checkout', 'POST', {
         projectIds,
         couponCode: coupon?.code,
-        transactionRef: utrNumber.trim(),
+        transactionRef: isFreeOrder ? 'FREE_GIFT_VOUCHER' : utrNumber.trim(),
         contactEmail: contactEmail.trim(),
         contactPhone: contactPhone.trim(),
         referredByCode: refCode || null,
@@ -173,7 +174,11 @@ const Cart = () => {
           }
         }
         clearCart();
-        alert('UTR Submitted Successfully! Once verified by Admin, your download access will be unlocked.');
+        if (data.isFreeOrder || isFreeOrder) {
+          alert('🎁 Congratulations! Your Gift Voucher was redeemed and project download is unlocked in your dashboard!');
+        } else {
+          alert('UTR Submitted Successfully! Once verified by Admin, your download access will be unlocked.');
+        }
         setShowQrModal(false);
         navigate('/dashboard');
       }
@@ -501,7 +506,26 @@ const Cart = () => {
               </button>
             </div>
 
-            {/* QR Card Frame */}
+            {finalTotal === 0 ? (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%)',
+                border: '1px solid #10b981',
+                borderRadius: '12px',
+                padding: '24px 16px',
+                textAlign: 'center',
+                marginBottom: '20px',
+              }}>
+                <div style={{ fontSize: '38px', marginBottom: '8px' }}>🎁</div>
+                <h3 style={{ fontSize: '18px', color: '#10b981', margin: '0 0 6px 0', fontWeight: 700 }}>
+                  VIP Gift Voucher Applied — 100% FREE!
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                  No payment or UPI transfer is required. Enter your delivery email below to claim and instantly unlock download access.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* QR Card Frame */}
             <div
               style={{
                 background: 'var(--bg-tertiary)',
@@ -619,6 +643,9 @@ const Cart = () => {
               </a>
             </div>
 
+            
+              </>
+            )}
             {/* UTR Input Form */}
             <form onSubmit={handleQrSubmit}>
               <div style={{ textAlign: 'left', marginBottom: '16px' }}>
@@ -657,31 +684,33 @@ const Cart = () => {
                 />
               </div>
 
-              <div style={{ textAlign: 'left', marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
-                  12-Digit UPI Ref No. / UTR Number
-                </label>
-                <input
-                  type="text"
-                  maxLength="12"
-                  className="form-input"
-                  placeholder="Enter 12-digit transaction UTR number..."
-                  value={utrNumber}
-                  onChange={(e) => {
-                    setUtrNumber(e.target.value);
-                    setUtrError('');
-                  }}
-                  required
-                />
-                {utrError && <span style={{ color: 'var(--error)', fontSize: '11px', marginTop: '4px', display: 'block', fontWeight: 600 }}>{utrError}</span>}
-              </div>
+              {finalTotal > 0 && (
+                <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                    12-Digit UPI Ref No. / UTR Number
+                  </label>
+                  <input
+                    type="text"
+                    maxLength="12"
+                    className="form-input"
+                    placeholder="Enter 12-digit transaction UTR number..."
+                    value={utrNumber}
+                    onChange={(e) => {
+                      setUtrNumber(e.target.value);
+                      setUtrError('');
+                    }}
+                    required
+                  />
+                  {utrError && <span style={{ color: 'var(--error)', fontSize: '11px', marginTop: '4px', display: 'block', fontWeight: 600 }}>{utrError}</span>}
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowQrModal(false)}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={qrSubmitLoading}>
-                  {qrSubmitLoading ? 'Submitting...' : 'Confirm Payment'}
+                  {qrSubmitLoading ? 'Unlocking Project...' : (finalTotal === 0 ? '🎁 Claim Free Project Now' : 'Confirm Payment')}
                 </button>
               </div>
             </form>
