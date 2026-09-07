@@ -116,15 +116,15 @@ const Cart = () => {
     e.preventDefault();
     setUtrError('');
 
+    const isFreeOrder = (finalTotal === 0);
     if (!contactEmail || !contactEmail.includes('@')) {
-      setUtrError('Please enter a valid email address.');
+      setUtrError('Please enter your email address so we can send your project download link.');
       return;
     }
-    if (!contactPhone || contactPhone.trim().length < 10) {
+    if (!isFreeOrder && (!contactPhone || contactPhone.replace(/\D/g, '').length < 10)) {
       setUtrError('Please enter a valid 10-digit phone number.');
       return;
     }
-    const isFreeOrder = (finalTotal === 0);
     if (!isFreeOrder && (!utrNumber || utrNumber.trim().length !== 12 || isNaN(utrNumber))) {
       setUtrError('Please enter a valid 12-digit numeric UTR/Reference Number.');
       return;
@@ -154,6 +154,11 @@ const Cart = () => {
         clearCart();
         if (data.isFreeOrder || isFreeOrder) {
           alert(`🎁 Congratulations! Your 100% Free Project has been claimed!\n\n✓ Complete source code download link sent to: ${contactEmail.trim()}\n✓ Unlocked on your Dashboard under 'My Purchases'!`);
+          if (data.downloadLinks && data.downloadLinks[0] && data.downloadLinks[0].directUrl) {
+            try {
+              window.open(data.downloadLinks[0].directUrl, '_blank');
+            } catch (_) {}
+          }
         } else {
           alert('UTR Submitted Successfully! Once verified by Admin, your download access will be unlocked.');
         }
@@ -409,10 +414,10 @@ const Cart = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <div style={{ textAlign: 'left' }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--primary)', fontWeight: 600 }}>
-                  Order Slip
+                  {finalTotal === 0 ? '100% Free VIP Voucher' : 'Order Slip'}
                 </span>
                 <h3 style={{ fontSize: '19px', color: 'var(--text-primary)', fontWeight: 700, margin: 0 }}>
-                  Scan &amp; Pay
+                  {finalTotal === 0 ? '🎁 Claim Your Project' : 'Scan & Pay'}
                 </h3>
               </div>
               <button
@@ -583,7 +588,7 @@ const Cart = () => {
             <form onSubmit={handleQrSubmit}>
               <div style={{ textAlign: 'left', marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
-                  Verification Email Address
+                  {finalTotal === 0 ? 'Delivery Email Address * (Project link will be sent here)' : 'Verification Email Address *'}
                 </label>
                 <input
                   type="email"
@@ -601,19 +606,19 @@ const Cart = () => {
 
               <div style={{ textAlign: 'left', marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
-                  Contact Phone Number
+                  {finalTotal === 0 ? 'Phone / WhatsApp (Optional)' : 'Contact Phone Number *'}
                 </label>
                 <input
                   type="tel"
                   className="form-input"
-                  placeholder="Enter 10-digit phone number..."
+                  placeholder={finalTotal === 0 ? "Enter phone / WhatsApp (optional)..." : "Enter 10-digit phone number..."}
                   value={contactPhone}
                   onChange={(e) => {
                     setContactPhone(e.target.value);
                     setUtrError('');
                   }}
                   onBlur={(e) => handleAbandonedLeadSave(undefined, e.target.value)}
-                  required
+                  required={finalTotal > 0}
                 />
               </div>
 
@@ -634,10 +639,25 @@ const Cart = () => {
                     }}
                     required
                   />
-                  {utrError && <span style={{ color: 'var(--error)', fontSize: '11px', marginTop: '4px', display: 'block', fontWeight: 600 }}>{utrError}</span>}
+                  
                 </div>
               )}
 
+              {utrError && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  color: '#ef4444',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  marginBottom: '16px',
+                  textAlign: 'left',
+                }}>
+                  ⚠️ {utrError}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setShowQrModal(false)}>
                   Cancel
