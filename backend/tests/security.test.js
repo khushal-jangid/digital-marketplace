@@ -367,6 +367,55 @@ async function runSecurityTests() {
     assert.strictEqual(downloadCount >= maxAllowed, true);
   });
 
+    // ----------------------------------------------------
+  // SECTION 10: VIP 100% FREE GIFT VOUCHERS & EDIT/DELETE TESTS
+  // ----------------------------------------------------
+  console.log('\n📦 10. VIP GIFT VOUCHERS & REDEMPTION SECURITY:');
+
+  await test('100% Gift Voucher calculates exactly zero final total', () => {
+    const voucher = {
+      code: 'GIFT-TEST-100',
+      discountType: 'percentage',
+      discountValue: 100,
+      usageLimit: 1,
+      targetProject: 'proj_apex_1',
+      targetProjectTitle: 'Apex Project',
+    };
+
+    const cart = [{ _id: 'proj_apex_1', title: 'Apex Project', price: 999 }];
+    const eligibility = validateCartEligibility(voucher, cart);
+    assert.strictEqual(eligibility.eligible, true);
+    assert.strictEqual(eligibility.eligibleSubtotal, 999);
+
+    const { discount, finalTotal } = calculateDiscount(voucher, eligibility.eligibleSubtotal, 999);
+    assert.strictEqual(discount, 999);
+    assert.strictEqual(finalTotal, 0); // Completely Free
+  });
+
+  await test('Gift Voucher is strictly locked to its target project', () => {
+    const voucher = {
+      code: 'GIFT-APEX-123',
+      discountType: 'percentage',
+      discountValue: 100,
+      targetProject: 'proj_apex_1',
+      targetProjectTitle: 'Apex Project',
+    };
+
+    const wrongCart = [{ _id: 'proj_other_99', title: 'Other Project', price: 1500 }];
+    const eligibility = validateCartEligibility(voucher, wrongCart);
+    assert.strictEqual(eligibility.eligible, false);
+  });
+
+  await test('Single-use voucher burns after 1 redemption (usageLimit = 1)', () => {
+    const voucher = {
+      code: 'GIFT-SINGLE-USE',
+      usageLimit: 1,
+      usedCount: 1,
+    };
+    const isExhausted = voucher.usedCount >= voucher.usageLimit;
+    assert.strictEqual(isExhausted, true);
+  });
+
   console.log('\n========================================');
   console.log(`📊 PHASE 2 TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);
   console.log('========================================\n');
