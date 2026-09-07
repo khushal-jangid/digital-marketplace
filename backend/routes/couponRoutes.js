@@ -2,6 +2,7 @@ import express from 'express';
 import {
   validateCoupon,
   createCoupon,
+  updateCoupon,
   getCoupons,
   deleteCoupon,
   getLatestActiveCoupon,
@@ -21,6 +22,7 @@ router.route('/')
   .post(protect, admin, createCoupon);
 
 router.route('/:id')
+  .put(protect, admin, updateCoupon)
   .delete(protect, admin, deleteCoupon);
 
 export default router;
