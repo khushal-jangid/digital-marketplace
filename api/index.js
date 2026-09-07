@@ -797,6 +797,34 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Valid UPI UTR required' });
     }
 
+    // Auto-resolve or create user account so order is tied and user can view dashboard
+    let authUser = null;
+    if (userId) {
+      authUser = await User.findById(userId);
+    }
+    if (!authUser && cleanEmail) {
+      authUser = await User.findOne({ email: cleanEmail.toLowerCase() });
+    }
+    if (!authUser && cleanEmail) {
+      const randomPassword = crypto.randomBytes(8).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+      authUser = await User.create({
+        name: cleanEmail.split('@')[0],
+        email: cleanEmail.toLowerCase(),
+        password: hashedPassword,
+        role: 'user',
+      });
+    }
+    if (authUser) {
+      userId = authUser._id;
+    }
+
+    const autoToken = authUser ? jwt.sign(
+      { id: authUser._id, userId: authUser._id, email: authUser.email, role: authUser.role },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    ) : null;
+
     const orderItems = selectedProjects.map((p) => ({
       project: p._id || p.id,
       title: p.title,
@@ -812,7 +840,7 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
       projects: selectedProjects.map((p) => p._id || p.id),
       items: orderItems,
       totalAmount: finalTotal,
-      paymentStatus: isZeroOrder ? 'completed' : 'pending_verification',
+      paymentStatus: isZeroOrder ? 'paid' : 'pending_verification',
       paymentMethod: isZeroOrder ? 'VIP Gift Voucher (100% Free)' : 'UPI Direct Transfer',
       utrNumber: isZeroOrder ? (cleanUtr || 'GIFT-FREE-PASS') : cleanUtr,
       invoiceNumber,
@@ -826,7 +854,100 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
       await appliedCoupon.save();
     }
 
-    // 1. Send immediate confirmation email to customer
+    // Instant Delivery for 100% Free VIP Gift Voucher Claims
+    if (isZeroOrder) {
+      const cleanIp = normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket?.remoteAddress);
+      const deviceHash = getDeviceFingerprint(req.headers['user-agent']);
+
+      const downloadLinks = [];
+      for (const p of selectedProjects) {
+        const pId = (p._id || p.id).toString();
+        const jti = crypto.randomBytes(16).toString('hex');
+        const dlToken = jwt.sign(
+          {
+            projectId: pId,
+            orderId: newOrder._id.toString(),
+            userId: (userId || '').toString(),
+            clientIp: cleanIp,
+            deviceHash,
+            jti,
+            purpose: 'digital_download',
+          },
+          JWT_SECRET,
+          { expiresIn: '7d' }
+        );
+        const secureUrl = 'https://apexmarketstore.vercel.app/api/projects/download-secure?token=' + dlToken;
+        const directUrl = p.externalDownloadUrl || p.fileUrl || secureUrl;
+        downloadLinks.push({
+          title: p.title,
+          price: p.price,
+          downloadUrl: secureUrl,
+          directUrl: directUrl,
+        });
+      }
+
+      const downloadCardsHtml = downloadLinks.map((dl) => `
+        <div style="margin: 14px 0; padding: 18px; background: #ffffff; border: 2px solid #10b981; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);">
+          <h4 style="margin: 0 0 8px 0; font-size: 16px; color: #1e293b;">📦 ${dl.title}</h4>
+          <p style="margin: 0 0 12px 0; font-size: 13px; color: #64748b;">Source code and complete assets included.</p>
+          <a href="${dl.directUrl}" target="_blank" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: bold; display: inline-block;">
+            ⬇️ Download Project Source Code
+          </a>
+          ${dl.directUrl ? `<p style="margin: 8px 0 0 0; font-size: 11px; color: #64748b; word-break: break-all;">Direct Link: <a href="${dl.directUrl}" target="_blank">${dl.directUrl}</a></p>` : ''}
+        </div>
+      `).join('');
+
+      const freeEmailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <span style="font-size: 44px;">🎁</span>
+            <h2 style="color: #10b981; margin: 8px 0 0 0;">Congratulations! Your Project is Ready</h2>
+            <p style="color: #64748b; font-size: 14px; margin: 4px 0 0 0;">100% Free VIP Gift Voucher Redeemed</p>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0 0 6px 0;"><strong>Invoice ID:</strong> #${invoiceNumber}</p>
+            <p style="margin: 0 0 6px 0;"><strong>Amount Paid:</strong> <span style="color: #10b981; font-weight: bold;">₹0 (Free Gift Claim)</span></p>
+            <p style="margin: 0 0 6px 0;"><strong>Delivery Email:</strong> ${cleanEmail}</p>
+            <p style="margin: 0;"><strong>Status:</strong> <span style="color: #10b981; font-weight: bold;">✓ Unlocked & Instant Access</span></p>
+          </div>
+
+          <h3 style="color: #1e293b; margin: 20px 0 10px 0;">Your Download Files:</h3>
+          ${downloadCardsHtml}
+
+          <p style="margin: 24px 0; text-align: center;">
+            <a href="https://apexmarketstore.vercel.app/dashboard" style="background: #4f46e5; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
+              Access from Dashboard (My Purchases)
+            </a>
+          </p>
+
+          <p style="color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 24px; text-align: center;">
+            ApexMarket Support • khushaljangra721@gmail.com
+          </p>
+        </div>
+      `;
+
+      await sendMailNotification(
+        cleanEmail,
+        `🎁 Download Ready: Your Free Project #${invoiceNumber}`,
+        freeEmailHtml
+      );
+
+      sendTelegramAlert(
+        `🎁 <b>100% FREE GIFT VOUCHER CLAIMED!</b>\n\n📄 <b>Invoice:</b> ${invoiceNumber}\n💰 <b>Amount:</b> ₹0\n🎟️ <b>Voucher:</b> ${couponCode || 'N/A'}\n👤 <b>Customer:</b> ${cleanEmail} (${cleanPhone})\n📦 <b>Items:</b> ${selectedProjects.map((i) => i.title).join(', ')}\n⚡ <b>Status:</b> Project download emailed and unlocked instantly!`
+      );
+
+      return res.status(201).json({
+        success: true,
+        isFreeOrder: true,
+        message: '🎁 VIP Gift Voucher Redeemed! Download links sent to your email and unlocked on your dashboard.',
+        order: newOrder,
+        token: autoToken,
+        downloadLinks,
+      });
+    }
+
+    // 1. Send confirmation email for paid orders awaiting verification
     const customerSubmissionHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
         <h2 style="color: #4f46e5; margin-top: 0;">Order Submitted for Verification</h2>
