@@ -859,6 +859,28 @@ app.post('/api/orders/qr-checkout', async (req, res) => {
       const cleanIp = normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket?.remoteAddress);
       const deviceHash = getDeviceFingerprint(req.headers['user-agent']);
 
+      // Ensure Download History record is created immediately so user sees it in their dashboard
+      if (userId) {
+        for (const p of selectedProjects) {
+          const pId = (p._id || p.id).toString();
+          await DownloadLog.findOneAndUpdate(
+            { user: userId, project: pId, order: newOrder._id },
+            {
+              $set: {
+                user: userId,
+                project: pId,
+                order: newOrder._id,
+                downloadCount: 1,
+                maxDownloadsAllowed: 5,
+                clientIp: cleanIp,
+                lastDownloadedAt: new Date(),
+              },
+            },
+            { upsert: true, new: true }
+          ).catch(() => {});
+        }
+      }
+
       const downloadLinks = [];
       for (const p of selectedProjects) {
         const pId = (p._id || p.id).toString();
@@ -1223,6 +1245,58 @@ app.get('/api/orders/my-purchases', authenticate, async (req, res) => {
     res.json({ success: true, count: purchases.length, purchases });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.get('/api/orders/download-history', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    // Auto-sync: Ensure every claimed or paid project appears in Download History
+    try {
+      const paidOrders = await Order.find({
+        $or: [{ user: userId }, { userEmail: req.user?.email }],
+        paymentStatus: { $in: ['paid', 'completed', 'fulfilled'] },
+      }).populate('projects items.project');
+
+      for (const order of paidOrders) {
+        const itemsList = Array.isArray(order.items) && order.items.length > 0 ? order.items : (order.projects || []).map((p) => ({ project: p }));
+        for (const item of itemsList) {
+          const proj = item.project;
+          if (!proj) continue;
+          const pId = (proj._id || proj.id || proj).toString();
+          const existingLog = await DownloadLog.findOne({
+            $or: [
+              { user: userId, project: pId },
+              { order: order._id, project: pId },
+            ],
+          });
+          if (!existingLog) {
+            await DownloadLog.create({
+              user: userId,
+              project: pId,
+              order: order._id,
+              downloadCount: 1,
+              maxDownloadsAllowed: 5,
+              lastDownloadedAt: order.createdAt || new Date(),
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (syncErr) {
+      console.warn('[Vercel Download History Sync Error]:', syncErr.message);
+    }
+
+    const logs = await DownloadLog.find({ user: userId })
+      .populate('project')
+      .sort({ updatedAt: -1, lastDownloadedAt: -1 });
+
+    return res.json({ success: true, count: logs.length, history: logs, logs });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
