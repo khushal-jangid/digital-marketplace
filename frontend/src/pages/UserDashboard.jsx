@@ -555,17 +555,61 @@ const UserDashboard = () => {
                             <th style={{ padding: '12px 8px' }}>Category</th>
                             <th style={{ padding: '12px 8px' }}>Download Count</th>
                             <th style={{ padding: '12px 8px' }}>Last Downloaded</th>
+                            <th style={{ padding: '12px 8px', textAlign: 'right' }}>Action</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {downloads.map((log) => (
-                            <tr key={log._id} style={{ borderBottom: '1px solid var(--border)' }}>
-                              <td style={{ padding: '12px 8px', color: 'var(--text-primary)', fontWeight: 600 }}>{log.project?.title || 'Unknown Title'}</td>
-                              <td style={{ padding: '12px 8px', textTransform: 'capitalize' }}>{log.project?.category || 'N/A'}</td>
-                              <td style={{ padding: '12px 8px' }}>{log.downloadCount} / {log.maxDownloadsAllowed}</td>
-                              <td style={{ padding: '12px 8px' }}>{new Date(log.lastDownloadedAt).toLocaleString()}</td>
-                            </tr>
-                          ))}
+                          {downloads.map((log) => {
+                            const projectTitle = log.project?.title || 'Unknown Title';
+                            const directUrl = log.project?.externalDownloadUrl || log.project?.fileUrl;
+                            return (
+                              <tr key={log._id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <td style={{ padding: '12px 8px', color: 'var(--text-primary)', fontWeight: 600 }}>{projectTitle}</td>
+                                <td style={{ padding: '12px 8px', textTransform: 'capitalize' }}>{log.project?.category || 'source-code'}</td>
+                                <td style={{ padding: '12px 8px' }}>{log.downloadCount || 1} / {log.maxDownloadsAllowed || 5}</td>
+                                <td style={{ padding: '12px 8px' }}>{new Date(log.lastDownloadedAt || log.createdAt || Date.now()).toLocaleString()}</td>
+                                <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                                  {directUrl ? (
+                                    <a
+                                      href={directUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        background: 'rgba(16, 185, 129, 0.15)',
+                                        color: '#10b981',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        padding: '6px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        fontWeight: '600',
+                                        textDecoration: 'none',
+                                      }}
+                                    >
+                                      <DownloadCloud size={14} /> Download
+                                    </a>
+                                  ) : (
+                                    <button
+                                      onClick={() => setActiveTab('purchases')}
+                                      style={{
+                                        background: 'var(--bg-tertiary)',
+                                        color: 'var(--text-secondary)',
+                                        border: '1px solid var(--border)',
+                                        padding: '6px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      View Purchases
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
