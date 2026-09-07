@@ -2531,25 +2531,25 @@ const AdminDashboard = () => {
                             🎁 Free Lead Download
                           </div>
                         )}
-                        {o.paymentMethod === 'qr_code' && (
+                        {(o.transactionRef || o.utrNumber || o.paymentMethod === 'qr_code' || o.paymentMethod === 'upi' || o.paymentMethod === 'UPI Direct Transfer') && (
                           <div style={{
                             marginTop: '8px',
                             padding: '8px 10px',
-                            borderRadius: '4px',
+                            borderRadius: '6px',
                             background: 'var(--bg-tertiary)',
                             border: '1px dashed var(--border-hover)',
                             fontFamily: 'var(--font-mono)',
-                            fontSize: '11px',
+                            fontSize: '11.5px',
                             lineHeight: '1.5'
                           }}>
-                            <span style={{ display: 'block', fontWeight: '600', color: 'var(--primary)', letterSpacing: '0.02em' }}>
-                              UTR {o.transactionRef}
+                            <span style={{ display: 'block', fontWeight: '700', color: '#10b981', letterSpacing: '0.02em' }}>
+                              💳 UTR: {o.transactionRef || o.utrNumber || 'N/A'}
+                            </span>
+                            <span style={{ display: 'block', color: 'var(--text-primary)' }}>
+                              📧 {o.contactEmail || o.userEmail || o.user?.email || 'N/A'}
                             </span>
                             <span style={{ display: 'block', color: 'var(--text-secondary)' }}>
-                              {o.contactEmail || 'N/A'}
-                            </span>
-                            <span style={{ display: 'block', color: 'var(--text-secondary)' }}>
-                              {o.contactPhone || 'N/A'}
+                              📞 {o.contactPhone || o.customerPhone || 'N/A'}
                             </span>
                           </div>
                         )}
