@@ -54,7 +54,7 @@ export const validateCoupon = async (req, res) => {
 };
 
 /**
- * @desc    Create a new coupon (Admin only)
+ * @desc    Create a new coupon or VIP Gift Voucher (Admin only)
  * @route   POST /api/coupons
  * @access  Private/Admin
  */
@@ -70,6 +70,8 @@ export const createCoupon = async (req, res) => {
     usageLimit,
     targetProject,
     targetProjectTitle,
+    isGiftVoucher,
+    notes,
   } = req.body;
 
   try {
@@ -130,6 +132,8 @@ export const createCoupon = async (req, res) => {
         isActive: true,
         targetProject: parsedTargetProject,
         targetProjectTitle: parsedTargetTitle,
+        isGiftVoucher: Boolean(isGiftVoucher),
+        notes: (notes || '').trim(),
         createdAt: new Date(),
       };
 
@@ -153,25 +157,142 @@ export const createCoupon = async (req, res) => {
       usageLimit: parsedUsageLimit,
       targetProject: parsedTargetProject,
       targetProjectTitle: parsedTargetTitle,
+      isGiftVoucher: Boolean(isGiftVoucher),
+      notes: (notes || '').trim(),
     });
 
-    // Background notify subscribers
-    Subscriber.find({})
-      .then((subs) => {
-        if (subs && subs.length > 0) {
-          sendNewCouponEmail(subs, coupon).catch(() => {});
-        }
-      })
-      .catch(() => {});
+    // Notify subscribers only for global promotional coupons, NOT for private gift vouchers
+    if (!isGiftVoucher) {
+      Subscriber.find({})
+        .then((subs) => {
+          if (subs && subs.length > 0) {
+            sendNewCouponEmail(subs, coupon).catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
 
-    return res.status(201).json({ success: true, message: 'Coupon created successfully!', coupon });
+    return res.status(201).json({
+      success: true,
+      message: isGiftVoucher ? '🎁 VIP Gift Voucher created successfully!' : 'Coupon created successfully!',
+      coupon,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, code: 'SERVER_ERROR', message: error.message });
   }
 };
 
 /**
- * @desc    Get all coupons (Admin only)
+ * @desc    Update/Edit an existing coupon or gift voucher (Admin only)
+ * @route   PUT /api/coupons/:id
+ * @access  Private/Admin
+ */
+export const updateCoupon = async (req, res) => {
+  try {
+    const couponId = req.params.id;
+    const {
+      code,
+      discountType,
+      discountValue,
+      minOrderAmount,
+      maxDiscount,
+      expiryDate,
+      usageLimit,
+      isActive,
+      targetProject,
+      targetProjectTitle,
+      isGiftVoucher,
+      notes,
+    } = req.body;
+
+    if (!isDbConnected()) {
+      const idx = mockDb.coupons.findIndex((c) => c._id === couponId || c.id === couponId);
+      if (idx === -1) {
+        return res.status(404).json({ success: false, code: 'COUPON_NOT_FOUND', message: 'Coupon not found' });
+      }
+      if (code) mockDb.coupons[idx].code = normalizeCouponCode(code);
+      if (discountValue !== undefined && !isNaN(discountValue)) mockDb.coupons[idx].discountValue = Number(discountValue);
+      if (discountType) mockDb.coupons[idx].discountType = discountType;
+      if (expiryDate) mockDb.coupons[idx].expiryDate = new Date(expiryDate);
+      if (usageLimit !== undefined) mockDb.coupons[idx].usageLimit = usageLimit !== '' && usageLimit !== null ? Number(usageLimit) : null;
+      if (isActive !== undefined) mockDb.coupons[idx].isActive = Boolean(isActive);
+      if (targetProject !== undefined) mockDb.coupons[idx].targetProject = targetProject === 'all' ? null : targetProject;
+      if (targetProjectTitle) mockDb.coupons[idx].targetProjectTitle = targetProjectTitle;
+      if (isGiftVoucher !== undefined) mockDb.coupons[idx].isGiftVoucher = Boolean(isGiftVoucher);
+      if (notes !== undefined) mockDb.coupons[idx].notes = notes.trim();
+
+      return res.json({ success: true, message: 'Coupon updated successfully!', coupon: mockDb.coupons[idx] });
+    }
+
+    const coupon = await Coupon.findById(couponId);
+    if (!coupon) {
+      return res.status(404).json({ success: false, code: 'COUPON_NOT_FOUND', message: 'Coupon not found' });
+    }
+
+    if (code) {
+      const cleanCode = normalizeCouponCode(code);
+      if (cleanCode !== coupon.code) {
+        const existing = await Coupon.findOne({ code: cleanCode, _id: { $ne: couponId } });
+        if (existing) {
+          return res.status(400).json({ success: false, code: 'COUPON_EXISTS', message: 'Another coupon with this code already exists.' });
+        }
+        coupon.code = cleanCode;
+      }
+    }
+
+    if (discountType) coupon.discountType = discountType === 'fixed' ? 'fixed' : 'percentage';
+    if (discountValue !== undefined && !isNaN(discountValue)) {
+      const val = Number(discountValue);
+      if (val <= 0 || (coupon.discountType === 'percentage' && val > 100)) {
+        return res.status(400).json({ success: false, code: 'INVALID_VALUE', message: 'Invalid discount value.' });
+      }
+      coupon.discountValue = val;
+    }
+
+    if (minOrderAmount !== undefined && !isNaN(minOrderAmount)) {
+      coupon.minOrderAmount = Number(minOrderAmount);
+    }
+
+    if (maxDiscount !== undefined) {
+      coupon.maxDiscount = maxDiscount !== '' && maxDiscount !== null && !isNaN(maxDiscount) ? Number(maxDiscount) : null;
+    }
+
+    if (expiryDate) {
+      const exp = new Date(expiryDate);
+      exp.setHours(23, 59, 59, 999);
+      coupon.expiryDate = exp;
+    }
+
+    if (usageLimit !== undefined) {
+      coupon.usageLimit = usageLimit !== '' && usageLimit !== null && !isNaN(usageLimit) ? Number(usageLimit) : null;
+    }
+
+    if (isActive !== undefined) {
+      coupon.isActive = Boolean(isActive);
+    }
+
+    if (targetProject !== undefined) {
+      coupon.targetProject = targetProject && targetProject !== 'all' ? targetProject : null;
+      coupon.targetProjectTitle = targetProjectTitle || (coupon.targetProject ? 'Selected Project' : 'All Projects');
+    }
+
+    if (isGiftVoucher !== undefined) {
+      coupon.isGiftVoucher = Boolean(isGiftVoucher);
+    }
+
+    if (notes !== undefined) {
+      coupon.notes = notes.trim();
+    }
+
+    await coupon.save();
+    return res.json({ success: true, message: 'Coupon / Voucher updated successfully!', coupon });
+  } catch (error) {
+    return res.status(500).json({ success: false, code: 'SERVER_ERROR', message: error.message });
+  }
+};
+
+/**
+ * @desc    Get all coupons & vouchers (Admin only)
  * @route   GET /api/coupons
  * @access  Private/Admin
  */
@@ -188,7 +309,7 @@ export const getCoupons = async (req, res) => {
 };
 
 /**
- * @desc    Delete/Deactivate a coupon (Admin only)
+ * @desc    Delete a coupon/voucher (Admin only)
  * @route   DELETE /api/coupons/:id
  * @access  Private/Admin
  */
@@ -220,7 +341,7 @@ export const getLatestActiveCoupon = async (req, res) => {
   try {
     if (!isDbConnected()) {
       const activeCoupons = mockDb.coupons.filter(
-        (c) => c.isActive && new Date() <= new Date(c.expiryDate)
+        (c) => c.isActive && !c.isGiftVoucher && new Date() <= new Date(c.expiryDate)
       );
       const latest = activeCoupons.length > 0 ? activeCoupons[activeCoupons.length - 1] : null;
       return res.json({ success: true, coupon: latest });
@@ -228,6 +349,7 @@ export const getLatestActiveCoupon = async (req, res) => {
 
     const latest = await Coupon.findOne({
       isActive: true,
+      isGiftVoucher: { $ne: true }, // Exclude private gift vouchers from public banner
       expiryDate: { $gt: new Date() },
     }).sort({ createdAt: -1 });
 
@@ -283,4 +405,14 @@ export const generateBugReward = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ success: false, code: 'SERVER_ERROR', message: error.message });
   }
+};
+
+export default {
+  validateCoupon,
+  createCoupon,
+  updateCoupon,
+  getCoupons,
+  deleteCoupon,
+  getLatestActiveCoupon,
+  generateBugReward,
 };
