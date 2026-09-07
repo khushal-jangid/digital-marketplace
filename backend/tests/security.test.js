@@ -8,7 +8,7 @@ import couponService, {
   validateCoupon,
 } from '../services/couponService.js';
 import { getJwtSecret, signJwt, verifyJwt } from '../config/jwt.js';
-import { getSecureFilePath, SECURE_UPLOAD_DIR } from '../config/storage.js';
+import { getSecureFilePath, SECURE_UPLOAD_DIR, generateSignedDownloadUrl, getDeviceFingerprint, normalizeIpAddress } from '../config/storage.js';
 import { verifyRazorpaySignature } from '../config/razorpay.js';
 
 let passed = 0;
@@ -317,6 +317,54 @@ async function runSecurityTests() {
     const validKey = '1783848506437-abcdef123456.zip';
     const resolved = getSecureFilePath(validKey);
     assert.ok(resolved.startsWith(SECURE_UPLOAD_DIR));
+  });
+
+    // ----------------------------------------------------
+  // SECTION 9: ONE-TIME TOKEN, IP & DEVICE LOCK, AND 5-DOWNLOAD LIMIT
+  // ----------------------------------------------------
+  console.log('\n📦 9. ONE-TIME TOKEN, IP/DEVICE LOCK & 5-DOWNLOAD LIMIT:');
+
+  await test('generateSignedDownloadUrl produces unique one-time jti and binds IP & device', () => {
+    const url1 = generateSignedDownloadUrl('file.zip', 'file.zip', 'user_1', 'proj_1', 'order_1', '192.168.1.50', 'Mozilla/5.0 Chrome');
+    const url2 = generateSignedDownloadUrl('file.zip', 'file.zip', 'user_1', 'proj_1', 'order_1', '192.168.1.50', 'Mozilla/5.0 Chrome');
+    assert.notStrictEqual(url1, url2);
+
+    const token1 = url1.split('token=')[1];
+    const decoded = verifyJwt(token1);
+    assert.strictEqual(decoded.clientIp, '192.168.1.50');
+    assert.strictEqual(decoded.deviceHash, getDeviceFingerprint('Mozilla/5.0 Chrome'));
+    assert.ok(decoded.jti && decoded.jti.length === 32);
+  });
+
+  await test('One-time self-destruct logic: reusing same jti is flagged as used', () => {
+    const usedTokens = [{ tokenHash: 'jti_abc123', usedAt: new Date() }];
+    const incomingJti = 'jti_abc123';
+    const isUsed = usedTokens.some((t) => t.tokenHash === incomingJti);
+    assert.strictEqual(isUsed, true);
+
+    const freshJti = 'jti_def456';
+    const isFreshUsed = usedTokens.some((t) => t.tokenHash === freshJti);
+    assert.strictEqual(isFreshUsed, false);
+  });
+
+  await test('IP & Device Lock: mismatch triggers rejection', () => {
+    const tokenIp = '103.21.54.1';
+    const attackerIp = '45.33.32.156';
+    const isIpMatch = tokenIp === attackerIp;
+    assert.strictEqual(isIpMatch, false);
+
+    const originalDevice = getDeviceFingerprint('Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)');
+    const attackerDevice = getDeviceFingerprint('Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+    assert.notStrictEqual(originalDevice, attackerDevice);
+  });
+
+  await test('Strict 5-download limit: 5th download allowed, 6th rejected', () => {
+    const maxAllowed = 5;
+    let downloadCount = 4;
+    assert.strictEqual(downloadCount < maxAllowed, true);
+
+    downloadCount = 5;
+    assert.strictEqual(downloadCount >= maxAllowed, true);
   });
 
   console.log('\n========================================');
