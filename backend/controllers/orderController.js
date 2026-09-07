@@ -237,7 +237,10 @@ export const createQrOrder = async (req, res) => {
       paymentMethod: isFreeOrder ? 'gift_voucher' : 'qr_code',
       transactionRef: isFreeOrder ? (cleanUtr || `GIFT-${validCouponCode || 'FREE'}-${Date.now()}`) : cleanUtr,
       contactEmail: cleanEmail,
+      userEmail: cleanEmail,
       contactPhone: cleanPhone,
+      customerPhone: cleanPhone,
+      projects: projects.map((p) => p._id),
       referredByCode: referredByCode ? referredByCode.trim().toUpperCase() : null,
       includeSetupAssistance: isSetupRequested,
       setupAssistancePrice: setupAssistanceFee,
@@ -254,22 +257,45 @@ export const createQrOrder = async (req, res) => {
       for (const p of projects) {
         p.downloadCount = (p.downloadCount || 0) + 1;
         await p.save().catch(() => {});
+
+        // Instant Download History record: Ensure user immediately sees this in their download history logs
+        if (userId) {
+          await DownloadLog.findOneAndUpdate(
+            { user: userId, project: p._id, order: order._id },
+            {
+              $set: {
+                user: userId,
+                project: p._id,
+                order: order._id,
+                downloadCount: 1,
+                maxDownloadsAllowed: 5,
+                clientIp: normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket?.remoteAddress),
+                lastDownloadedAt: new Date(),
+              },
+            },
+            { upsert: true, new: true }
+          ).catch((err) => console.warn('[DownloadLog Upsert Error]:', err.message));
+        }
       }
 
       const hostUrl = `${req.protocol}://${req.get('host')}`;
-      const downloadLinks = projects.map((p) => ({
-        title: p.title,
-        downloadUrl: generateSignedDownloadUrl(
+      const downloadLinks = projects.map((p) => {
+        const signedUrl = generateSignedDownloadUrl(
           p.fileKey || '',
           p.fileName || `${p.title}.zip`,
-          userId.toString(),
+          userId ? userId.toString() : '',
           p._id.toString(),
           order._id.toString(),
           normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket.remoteAddress),
           req.headers['user-agent'] || '',
           hostUrl
-        ),
-      }));
+        );
+        return {
+          title: p.title,
+          downloadUrl: signedUrl,
+          directUrl: p.externalDownloadUrl || p.fileUrl || signedUrl,
+        };
+      });
 
       sendPurchaseEmail(cleanEmail, authUser?.name || cleanEmail.split('@')[0], order, downloadLinks).catch((err) => {
         console.warn('[VOUCHER EMAIL ERROR]:', err.message);
@@ -289,6 +315,7 @@ export const createQrOrder = async (req, res) => {
         isFreeOrder: true,
         message: '🎁 Gift Voucher Redeemed Successfully! Your download access is unlocked instantly.',
         orderId: order._id,
+        downloadLinks,
         token: autoToken,
         user: authUser ? {
           _id: authUser._id,
@@ -369,6 +396,29 @@ export const processOrderApproval = async (orderId) => {
     await couponService.redeemCoupon(order.couponApplied).catch(() => {});
   }
   await creditAffiliateIfReferred(order).catch(() => {});
+
+  // Upsert download logs upon payment approval so items show in Download History immediately
+  if (order.user) {
+    const uId = order.user._id || order.user;
+    for (const item of (order.items || [])) {
+      if (!item.project) continue;
+      const pId = item.project._id || item.project;
+      await DownloadLog.findOneAndUpdate(
+        { user: uId, project: pId, order: order._id },
+        {
+          $set: {
+            user: uId,
+            project: pId,
+            order: order._id,
+            downloadCount: 1,
+            maxDownloadsAllowed: 5,
+            lastDownloadedAt: new Date(),
+          },
+        },
+        { upsert: true, new: true }
+      ).catch(() => {});
+    }
+  }
 
   const downloadLinks = [];
   for (const item of (order.items || [])) {
@@ -585,7 +635,37 @@ export const refundOrder = async (req, res) => {
 
 export const getDownloadHistory = async (req, res) => {
   try {
-    const logs = await DownloadLog.find({ user: req.user._id })
+    const userId = req.user._id;
+
+    // Auto-sync: Ensure every claimed or paid project appears in Download History
+    try {
+      const paidOrders = await Order.find({
+        $or: [{ user: userId }, { contactEmail: req.user.email }, { userEmail: req.user.email }],
+        paymentStatus: { $in: ['paid', 'fulfilled', 'completed'] },
+      }).populate('items.project');
+
+      for (const order of paidOrders) {
+        for (const item of (order.items || [])) {
+          if (!item.project) continue;
+          const pId = item.project._id || item.project;
+          const existingLog = await DownloadLog.findOne({ user: userId, project: pId });
+          if (!existingLog) {
+            await DownloadLog.create({
+              user: userId,
+              project: pId,
+              order: order._id,
+              downloadCount: 1,
+              maxDownloadsAllowed: 5,
+              lastDownloadedAt: order.createdAt || new Date(),
+            }).catch(() => {});
+          }
+        }
+      }
+    } catch (syncErr) {
+      console.warn('[Download History Sync Error]:', syncErr.message);
+    }
+
+    const logs = await DownloadLog.find({ user: userId })
       .populate('project')
       .sort({ updatedAt: -1, lastDownloadedAt: -1 });
     return res.json({ success: true, count: logs.length, history: logs, logs });
