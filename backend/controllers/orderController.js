@@ -4,7 +4,7 @@ import Project from '../models/Project.js';
 import User from '../models/User.js';
 import DownloadLog from '../models/DownloadLog.js';
 import AbandonedLead from '../models/AbandonedLead.js';
-import { generateSignedDownloadUrl } from '../config/storage.js';
+import { generateSignedDownloadUrl, normalizeIpAddress } from '../config/storage.js';
 import { sendPurchaseEmail, sendRejectionEmail, sendRecoveryEmail, sendOrderPendingEmail } from '../config/mail.js';
 import { sendTelegramMessage, answerCallbackQuery, editTelegramMessage } from '../config/telegram.js';
 import { signJwt, verifyJwt } from '../config/jwt.js';
@@ -404,6 +404,8 @@ export const getMyPurchasedProjects = async (req, res) => {
   try {
     const userId = req.user._id;
     const hostUrl = `${req.protocol}://${req.get('host')}`;
+    const clientIp = normalizeIpAddress(req.headers['x-forwarded-for'] || req.socket.remoteAddress);
+    const userAgent = req.headers['user-agent'] || '';
 
     const paidOrders = await Order.find({
       user: userId,
@@ -413,6 +415,16 @@ export const getMyPurchasedProjects = async (req, res) => {
       .sort({ createdAt: -1 });
 
     const allUserOrders = await Order.find({ user: userId }).sort({ createdAt: -1 });
+
+    // Fetch user download logs to track real-time download counters
+    const userLogs = await DownloadLog.find({ user: userId });
+    const logMap = new Map();
+    userLogs.forEach((l) => {
+      if (l.project) {
+        logMap.set(`${l.project.toString()}_${l.order ? l.order.toString() : ''}`, l);
+        logMap.set(l.project.toString(), l);
+      }
+    });
 
     const purchasesMap = new Map();
 
@@ -428,15 +440,26 @@ export const getMyPurchasedProjects = async (req, res) => {
             userId.toString(),
             pId,
             order._id.toString(),
+            clientIp,
+            userAgent,
             hostUrl
           );
+
+          const log = logMap.get(`${pId}_${order._id.toString()}`) || logMap.get(pId);
+          const downloadCount = log ? (log.downloadCount || 0) : 0;
+          const maxDownloadsAllowed = log ? (log.maxDownloadsAllowed || 5) : 5;
+          const isDownloadExhausted = downloadCount >= maxDownloadsAllowed;
 
           purchasesMap.set(pId, {
             project: item.project,
             orderId: order._id,
             purchaseDate: order.createdAt,
             licenseType: item.licenseType || 'personal',
-            downloadUrl: item.project.fileUrl || item.project.externalDownloadUrl || downloadUrl,
+            downloadUrl,
+            downloadCount,
+            maxDownloadsAllowed,
+            remainingDownloads: Math.max(0, maxDownloadsAllowed - downloadCount),
+            isDownloadExhausted,
             invoiceNumber: order.invoiceNumber || `INV-${order._id.toString().slice(-6).toUpperCase()}`,
           });
         }
@@ -500,8 +523,10 @@ export const refundOrder = async (req, res) => {
 
 export const getDownloadHistory = async (req, res) => {
   try {
-    const logs = await DownloadLog.find({ user: req.user._id }).populate('project').sort({ downloadedAt: -1 });
-    return res.json({ success: true, count: logs.length, logs });
+    const logs = await DownloadLog.find({ user: req.user._id })
+      .populate('project')
+      .sort({ updatedAt: -1, lastDownloadedAt: -1 });
+    return res.json({ success: true, count: logs.length, history: logs, logs });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
