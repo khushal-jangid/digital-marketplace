@@ -239,6 +239,12 @@ const AdminDashboard = () => {
   const [couponLimit, setCouponLimit] = useState('');
   const [couponTargetProject, setCouponTargetProject] = useState('all');
   const [couponLoading, setCouponLoading] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState(null);
+  const [voucherTargetProject, setVoucherTargetProject] = useState('all');
+  const [voucherNote, setVoucherNote] = useState('');
+  const [generatedVoucher, setGeneratedVoucher] = useState(null);
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [copiedVoucher, setCopiedVoucher] = useState(false);
 
   // Orders State
   const [orders, setOrders] = useState([]);
@@ -865,18 +871,24 @@ const AdminDashboard = () => {
       };
       if (couponLimit && !isNaN(couponLimit)) {
         body.usageLimit = Number(couponLimit);
+      } else if (editingCoupon) {
+        body.usageLimit = null;
       }
 
-      const data = await request('/coupons', 'POST', body);
+      const endpoint = editingCoupon ? `/coupons/${editingCoupon._id}` : '/coupons';
+      const method = editingCoupon ? 'PUT' : 'POST';
+
+      const data = await request(endpoint, method, body);
       if (data.success) {
         const created = data.coupon || body;
         const discountLabel = `${created.discountValue}${created.discountType === 'percentage' ? '%' : ' INR'} OFF`;
         setCouponNotification({
           type: 'success',
           code: created.code,
-          title: `🎉 Coupon Code "${created.code}" Created Successfully!`,
+          title: editingCoupon ? `🎉 Coupon "${created.code}" Updated Successfully!` : `🎉 Coupon Code "${created.code}" Created Successfully!`,
           details: `Flat ${discountLabel} applied on ${created.targetProjectTitle || 'All Projects'} • Valid until ${new Date(created.expiryDate).toLocaleDateString()}`,
         });
+        setEditingCoupon(null);
         setCouponCode('');
         setCouponValue('');
         setCouponExpiry('');
@@ -892,7 +904,7 @@ const AdminDashboard = () => {
     } catch (error) {
       setCouponNotification({
         type: 'error',
-        title: '❌ Coupon Creation Failed',
+        title: editingCoupon ? '❌ Coupon Update Failed' : '❌ Coupon Creation Failed',
         details: error.message || 'Could not save coupon to database.',
       });
     } finally {
@@ -900,12 +912,81 @@ const AdminDashboard = () => {
     }
   };
 
+  const startEditCoupon = (c) => {
+    setEditingCoupon(c);
+    setCouponCode(c.code || '');
+    setCouponType(c.discountType || 'percentage');
+    setCouponValue(c.discountValue || '');
+    setCouponExpiry(c.expiryDate ? new Date(c.expiryDate).toISOString().split('T')[0] : '');
+    setCouponLimit(c.usageLimit !== null && c.usageLimit !== undefined ? c.usageLimit : '');
+    setCouponTargetProject(c.targetProject ? c.targetProject.toString() : 'all');
+  };
+
+  const cancelEditCoupon = () => {
+    setEditingCoupon(null);
+    setCouponCode('');
+    setCouponValue('');
+    setCouponExpiry('');
+    setCouponLimit('');
+    setCouponTargetProject('all');
+  };
+
+  const handleGenerateVoucher = async () => {
+    setVoucherLoading(true);
+    setGeneratedVoucher(null);
+    try {
+      const selectedProj = voucherTargetProject !== 'all' ? projects.find(p => p._id === voucherTargetProject) : null;
+      const projTag = selectedProj ? selectedProj.title.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).toUpperCase() : 'VIP';
+      const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const vCode = `GIFT-${projTag}-${randomPart}`;
+
+      const expDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      const body = {
+        code: vCode,
+        discountType: 'percentage',
+        discountValue: 100, // 100% Free
+        usageLimit: 1, // Single-use!
+        expiryDate: expDate,
+        targetProject: selectedProj ? selectedProj._id : null,
+        targetProjectTitle: selectedProj ? selectedProj.title : 'All Projects',
+        isGiftVoucher: true,
+        notes: voucherNote.trim(),
+      };
+
+      const data = await request('/coupons', 'POST', body);
+      if (data.success) {
+        const siteUrl = window.location.origin;
+        const redeemUrl = `${siteUrl}/cart?code=${vCode}`;
+        const projName = selectedProj ? selectedProj.title : 'Selected Project';
+        const whatsappText = `Hey! Here is your 100% FREE access voucher for "${projName}": *${vCode}*.\n\nRedeem it here: ${redeemUrl}`;
+
+        setGeneratedVoucher({
+          code: vCode,
+          projectName: projName,
+          redeemUrl,
+          whatsappText,
+          expiry: expDate,
+        });
+
+        await fetchCoupons();
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to generate voucher');
+    } finally {
+      setVoucherLoading(false);
+    }
+  };
+
   const handleDeleteCoupon = async (couponId) => {
-    if (!window.confirm('Delete coupon code?')) return;
+    if (!window.confirm('Are you sure you want to permanently delete this coupon/voucher?')) return;
     try {
       const data = await request(`/coupons/${couponId}`, 'DELETE');
       if (data.success) {
         setCoupons(coupons.filter((c) => c._id !== couponId));
+        if (editingCoupon && editingCoupon._id === couponId) {
+          cancelEditCoupon();
+        }
       }
     } catch (error) {
       alert(error.message || 'Delete failed');
@@ -1526,6 +1607,7 @@ const AdminDashboard = () => {
             </form>
           </div>
         </div>
+        </div>
       )}
 
       {/* Coupons Tab */}
@@ -1734,9 +1816,149 @@ const AdminDashboard = () => {
       )}
 
       {activeTab === 'coupons' && (
-        <div className="responsive-admin-grid" style={{
-          alignItems: 'flex-start'
-        }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* 🎁 VIP 100% Free Gift Voucher Generator Card */}
+          <div className="glass-card" style={{
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%)',
+            border: '1px solid rgba(99, 102, 241, 0.3)',
+            padding: '24px',
+            borderRadius: '16px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h3 style={{ fontSize: '18px', color: 'var(--text-primary)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Gift size={20} style={{ color: '#10b981' }} /> 1-Click VIP Gift Voucher Generator (100% Free)
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                  Kisi specific dost ya client ko project 100% FREE me bhejne ke liye single-use burn code banayein.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', alignItems: 'end' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                  🎯 Select Project to Gift *
+                </label>
+                <select
+                  className="form-input"
+                  value={voucherTargetProject}
+                  onChange={(e) => setVoucherTargetProject(e.target.value)}
+                >
+                  <option value="all">🌟 All Projects (Storewide 100% Free Pass)</option>
+                  {projects.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      📦 {p.title} (Value: INR {p.price})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                  📝 Note / Recipient Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Gift for Rahul / Client VIP access"
+                  className="form-input"
+                  value={voucherNote}
+                  onChange={(e) => setVoucherNote(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={handleGenerateVoucher}
+                  disabled={voucherLoading}
+                  className="btn btn-primary"
+                  style={{
+                    width: '100%',
+                    padding: '11px',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Sparkles size={16} /> {voucherLoading ? 'Generating...' : '⚡ Generate 100% Free Voucher'}
+                </button>
+              </div>
+            </div>
+
+            {/* Display Generated Voucher Modal/Card */}
+            {generatedVoucher && (
+              <div style={{
+                marginTop: '20px',
+                padding: '18px',
+                background: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid #10b981',
+                borderRadius: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700, textTransform: 'uppercase' }}>
+                      ✅ Voucher Ready:
+                    </span>
+                    <code style={{
+                      fontSize: '18px',
+                      fontWeight: 'bold',
+                      color: 'var(--text-primary)',
+                      background: 'var(--bg-primary)',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      letterSpacing: '1px'
+                    }}>
+                      {generatedVoucher.code}
+                    </code>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedVoucher.code);
+                        setCopiedVoucher(true);
+                        setTimeout(() => setCopiedVoucher(false), 2000);
+                      }}
+                      className="btn btn-secondary"
+                      style={{ padding: '6px 14px', fontSize: '12.5px' }}
+                    >
+                      {copiedVoucher ? '✓ Code Copied!' : 'Copy Code'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(generatedVoucher.whatsappText);
+                        alert('WhatsApp message copied to clipboard! Paste it to your friend/client.');
+                      }}
+                      className="btn btn-primary"
+                      style={{ padding: '6px 14px', fontSize: '12.5px', background: '#10b981', border: 'none' }}
+                    >
+                      💬 Copy WhatsApp Message
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  🔒 <strong>Single-Use Protection:</strong> This voucher is valid for 1 redemption on <em>"{generatedVoucher.projectName}"</em>. After claiming, it will automatically burn and expire.
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="responsive-admin-grid" style={{ alignItems: 'flex-start' }}>
           {/* Left coupons list table */}
           <div className="glass-card">
             <h3 style={{ fontSize: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '20px' }}>
@@ -1760,7 +1982,24 @@ const AdminDashboard = () => {
                   <tbody>
                     {coupons.map((c, idx) => (
                       <tr key={c._id || c.id || ('coup-' + idx)} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '12px 8px', color: 'var(--primary)', fontWeight: 'bold' }}>{c.code}</td>
+                        <td style={{ padding: '12px 8px', color: 'var(--primary)', fontWeight: 'bold' }}>
+                          <span>{c.code}</span>
+                          {(c.isGiftVoucher || c.discountValue === 100) && (
+                            <span style={{
+                              marginLeft: '6px',
+                              fontSize: '10px',
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              color: '#10b981',
+                              border: '1px solid rgba(16, 185, 129, 0.4)',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontWeight: 700,
+                              textTransform: 'uppercase'
+                            }}>
+                              🎁 VIP GIFT
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: '12px 8px' }}>
                           <span style={{ fontSize: '11.5px', color: c.targetProjectTitle && c.targetProjectTitle !== 'All Projects' ? '#818cf8' : 'var(--text-secondary)', fontWeight: 600 }}>
                             {c.targetProjectTitle || 'All Projects'}
@@ -1795,12 +2034,24 @@ const AdminDashboard = () => {
                           {c.usedCount} {c.usageLimit ? `/ ${c.usageLimit}` : 'times'}
                         </td>
                         <td style={{ padding: '12px 8px' }}>
-                          <button
-                            onClick={() => handleDeleteCoupon(c._id)}
-                            style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer' }}
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => startEditCoupon(c)}
+                              style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', padding: '4px' }}
+                              title="Edit Coupon / Voucher"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCoupon(c._id)}
+                              style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px' }}
+                              title="Delete Coupon / Voucher"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1812,9 +2063,21 @@ const AdminDashboard = () => {
 
           {/* Right Create Coupon Form */}
           <div className="glass-card">
-            <h3 style={{ fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '20px' }}>
-              <Ticket size={18} style={{ color: 'var(--primary)' }} /> Create Promo Coupon
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <Ticket size={18} style={{ color: 'var(--primary)' }} /> {editingCoupon ? '✏️ Edit Coupon / Voucher' : 'Create Promo Coupon'}
+              </h3>
+              {editingCoupon && (
+                <button
+                  type="button"
+                  onClick={cancelEditCoupon}
+                  className="btn btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '12px' }}
+                >
+                  Cancel Edit
+                </button>
+              )}
+            </div>
 
             <form onSubmit={handleCreateCouponSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
@@ -1896,7 +2159,7 @@ const AdminDashboard = () => {
               </div>
 
               <button type="submit" disabled={couponLoading} className="btn btn-primary" style={{ padding: '12px', width: '100%', marginTop: '10px' }}>
-                Create Coupon
+                {editingCoupon ? 'Save Changes' : 'Create Coupon'}
               </button>
             </form>
           </div>
