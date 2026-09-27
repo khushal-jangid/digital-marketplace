@@ -43,7 +43,7 @@ const MONGO_URI =
   process.env.MONGO_URI ||
   'mongodb+srv://khushaljangra013_db_user:KJIGJtITbR4L8Yvi@cluster0.ywucg6a.mongodb.net/digital_marketplace?retryWrites=true&w=majority&appName=Cluster0';
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_token_key_for_digital_marketplace_web_app_2026';
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8865031996:AAFF85bx08Vaf1fr3WbaGuGvx3rMv_Sij0g';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8886038125:AAHs67C4ZxDpVYf81ymm0ZNtLbEe5GLKjJw';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '7370155608';
 const SMTP_USER = process.env.EMAIL_USER || process.env.SMTP_USER || 'khushaljangra721@gmail.com';
 const SMTP_PASS = (process.env.EMAIL_PASS || process.env.SMTP_PASS || 'vhlb tlrl iulw lqdi').replace(/["'\s]/g, '');
