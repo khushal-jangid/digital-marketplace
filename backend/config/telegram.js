@@ -1,5 +1,18 @@
-const getBotToken = () => process.env.TELEGRAM_BOT_TOKEN || '8886038125:AAHs67C4ZxDpVYf81ymm0ZNtLbEe5GLKjJw';
-const getChatId = () => process.env.TELEGRAM_CHAT_ID || '7370155608';
+const ACTIVE_BOT_TOKEN = '8886038125:AAHs67C4ZxDpVYf81ymm0ZNtLbEe5GLKjJw';
+const ACTIVE_CHAT_ID = '7370155608';
+
+const getBotToken = () => {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!token || token.includes('8865031996')) {
+    return ACTIVE_BOT_TOKEN;
+  }
+  return token;
+};
+
+const getChatId = () => {
+  const chatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
+  return chatId || ACTIVE_CHAT_ID;
+};
 
 /**
  * Send message to Telegram Chat/Group
@@ -39,6 +52,18 @@ export const sendTelegramMessage = async (text, replyMarkup = null, overrideChat
     const data = await response.json();
     if (!data.ok) {
       console.error('Telegram API Error:', data.description);
+      if (data.error_code === 401 && token !== ACTIVE_BOT_TOKEN) {
+        console.log('[TELEGRAM RETRY] Retrying with ACTIVE_BOT_TOKEN...');
+        const retryUrl = `https://api.telegram.org/bot${ACTIVE_BOT_TOKEN}/sendMessage`;
+        const retryRes = await fetch(retryUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...body, chat_id: ACTIVE_CHAT_ID }),
+        });
+        return await retryRes.json();
+      }
+    } else {
+      console.log(`[TELEGRAM ALERT SUCCESS] Sent to chat ${chatId} (ID: ${data.result?.message_id})`);
     }
     return data;
   } catch (error) {
