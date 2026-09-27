@@ -21,6 +21,7 @@ import {
   Sparkles,
   UserCheck,
   Send,
+  Bot,
 } from 'lucide-react';
 
 const Navbar = () => {
@@ -183,6 +184,28 @@ const Navbar = () => {
           >
             <MessageSquare size={14} />
             <span>Live Support</span>
+          </Link>
+
+          <Link
+            to="/ai-agent"
+            style={{
+              color: '#f59e0b',
+              background: isActive('/ai-agent') ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.08)',
+              textDecoration: 'none',
+              fontSize: '13px',
+              fontWeight: 700,
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
+            title="IndianAgent Multi-Tool AI"
+          >
+            <Bot size={15} style={{ color: '#f59e0b' }} />
+            <span>IndianAgent AI</span>
           </Link>
 
           <a
@@ -606,6 +629,30 @@ const Navbar = () => {
                 <span>Request Custom Project (₹50)</span>
               </div>
               <ArrowRight size={16} style={{ color: '#818cf8' }} />
+            </Link>
+
+            <Link
+              to="/ai-agent"
+              onClick={closeMobileMenu}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 16px',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(245, 158, 11, 0.1)',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
+                color: '#f59e0b',
+                textDecoration: 'none',
+                fontSize: '15px',
+                fontWeight: 700,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Bot size={18} style={{ color: '#f59e0b' }} />
+                <span>IndianAgent Multi-Tool AI</span>
+              </div>
+              <ArrowRight size={16} style={{ color: '#f59e0b' }} />
             </Link>
 
             <button
