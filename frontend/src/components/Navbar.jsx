@@ -20,6 +20,7 @@ import {
   ArrowRight,
   Sparkles,
   UserCheck,
+  Send,
 } from 'lucide-react';
 
 const Navbar = () => {
@@ -183,6 +184,30 @@ const Navbar = () => {
             <MessageSquare size={14} />
             <span>Live Support</span>
           </Link>
+
+          <a
+            href="https://t.me/+Z8ED50UDiZI2YWQ1"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: '#38bdf8',
+              background: 'rgba(56, 189, 248, 0.08)',
+              textDecoration: 'none',
+              fontSize: '13px',
+              fontWeight: 600,
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid rgba(56, 189, 248, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
+            title="Join Telegram Channel"
+          >
+            <Send size={13} />
+            <span>Telegram Channel</span>
+          </a>
 
           <div style={{ height: '18px', width: '1px', background: 'var(--border)', margin: '0 4px' }} />
 
@@ -686,6 +711,32 @@ const Navbar = () => {
                 </div>
                 <ArrowRight size={16} style={{ color: 'var(--text-muted)' }} />
               </Link>
+
+            <a
+              href="https://t.me/+Z8ED50UDiZI2YWQ1"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={closeMobileMenu}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 16px',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                color: '#38bdf8',
+                textDecoration: 'none',
+                fontSize: '15px',
+                fontWeight: 600,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Send size={18} style={{ color: '#38bdf8' }} />
+                <span>Join Telegram Channel</span>
+              </div>
+              <ArrowRight size={16} style={{ color: '#38bdf8' }} />
+            </a>
             )}
 
             {/* Theme & Currency Controls in Mobile Drawer */}
