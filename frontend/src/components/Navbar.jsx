@@ -758,6 +758,7 @@ const Navbar = () => {
                 </div>
                 <ArrowRight size={16} style={{ color: 'var(--text-muted)' }} />
               </Link>
+            )}
 
             <a
               href="https://t.me/+Z8ED50UDiZI2YWQ1"
@@ -784,7 +785,6 @@ const Navbar = () => {
               </div>
               <ArrowRight size={16} style={{ color: '#38bdf8' }} />
             </a>
-            )}
 
             {/* Theme & Currency Controls in Mobile Drawer */}
             <div
