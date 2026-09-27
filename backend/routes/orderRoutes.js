@@ -1,3 +1,4 @@
+import { sendTelegramMessage } from '../config/telegram.js';
 import express from 'express';
 import {
   checkout,
@@ -37,5 +38,16 @@ router.get('/download-history', protect, getDownloadHistory);
 router.get('/:id', protect, getOrderById);
 router.get('/', protect, admin, getAllOrders);
 router.delete('/:id', protect, admin, deleteOrder);
+
+
+// Diagnostic route to verify live Telegram alerts from Render backend
+router.get('/test-telegram-alert', async (req, res) => {
+  try {
+    const tgRes = await sendTelegramMessage('🔔 <b>TEST ORDER ALERT FROM LIVE BACKEND!</b>\n\nIf you see this, your backend is 100% connected to Telegram!');
+    res.json({ success: true, tgRes });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 export default router;
