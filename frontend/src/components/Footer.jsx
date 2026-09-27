@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Terminal, MessageSquare, Mail, Send } from "lucide-react";
+import { Terminal, MessageSquare, Mail, Send, Bot } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -56,6 +56,24 @@ const Footer = () => {
           <h5 style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: "13.5px", marginBottom: "2px" }}>
             Marketplace & Custom Work
           </h5>
+          <Link
+            to="/ai-agent"
+            style={{
+              color: "#f59e0b",
+              fontWeight: 700,
+              textDecoration: "none",
+              fontSize: "13px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              transition: "color 0.2s ease",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#fbbf24")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#f59e0b")}
+          >
+            <Bot size={14} />
+            <span>IndianAgent AI Tools</span>
+          </Link>
           <Link
             to="/custom-project"
             style={{
@@ -178,6 +196,7 @@ const Footer = () => {
       >
         <p>© {new Date().getFullYear()} Khushal Jangid — ApexMarket. All rights reserved.</p>
         <div style={{ display: "flex", gap: "16px" }}>
+          <Link to="/ai-agent" style={{ color: "#f59e0b", textDecoration: "none", fontWeight: 600 }}>🤖 IndianAgent AI</Link>
           <a href="https://t.me/+Z8ED50UDiZI2YWQ1" target="_blank" rel="noopener noreferrer" style={{ color: "#38bdf8", textDecoration: "none", fontWeight: 600 }}>Telegram Channel</a>
           <Link to="/projects" style={{ color: "var(--text-muted)", textDecoration: "none" }}>Projects Catalog</Link>
           <Link to="/custom-project" style={{ color: "var(--text-muted)", textDecoration: "none" }}>Custom Project (₹50)</Link>
