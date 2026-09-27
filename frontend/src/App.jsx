@@ -31,6 +31,7 @@ const SupportChat = lazy(() => import('./pages/SupportChat'));
 const AboutCreator = lazy(() => import('./pages/AboutCreator'));
 const RequestProject = lazy(() => import('./pages/RequestProject'));
 const CustomProjectRequest = lazy(() => import('./pages/CustomProjectRequest'));
+const AIAgent = lazy(() => import('./pages/AIAgent'));
 
 // Lightweight page loading indicator
 const PageLoader = () => (
@@ -103,6 +104,8 @@ function App() {
                       <Route path="/projects" element={<ProjectListing />} />
                       <Route path="/projects/:id" element={<ProjectDetail />} />
                       <Route path="/about-creator" element={<AboutCreator />} />
+                      <Route path="/ai-agent" element={<AIAgent />} />
+                      <Route path="/indian-agent" element={<AIAgent />} />
                       <Route path="/custom-project" element={<CustomProjectRequest />} />
                       <Route path="/request-project" element={<CustomProjectRequest />} />
                       <Route path="/cart" element={<Cart />} />
