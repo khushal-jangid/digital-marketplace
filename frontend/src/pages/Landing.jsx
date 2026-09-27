@@ -4,7 +4,7 @@ import { request } from '../utils/api';
 import ProjectCard from '../components/ProjectCard';
 import Loader from '../components/Loader';
 import FlashSaleBanner from '../components/FlashSaleBanner';
-import { Search, ArrowRight, Sparkles, Code } from 'lucide-react';
+import { Search, ArrowRight, Sparkles, Code, Send } from 'lucide-react';
 
 const Landing = () => {
   const [projects, setProjects] = useState([]);
@@ -69,6 +69,34 @@ const Landing = () => {
       >
         <div className="container" style={{ maxWidth: '760px', margin: '0 auto' }}>
           
+          {/* Telegram Channel Community Badge */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '18px' }}>
+            <a
+              href="https://t.me/+Z8ED50UDiZI2YWQ1"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 16px',
+                borderRadius: '24px',
+                background: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                color: '#38bdf8',
+                fontSize: '13px',
+                fontWeight: 600,
+                textDecoration: 'none',
+                boxShadow: '0 2px 10px rgba(56, 189, 248, 0.15)',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <Send size={13} style={{ color: '#38bdf8' }} />
+              <span>Join our Telegram for Free Source Codes & Deals</span>
+              <ArrowRight size={13} />
+            </a>
+          </div>
+
           <h1
             style={{
               fontSize: 'clamp(28px, 5vw, 42px)',
