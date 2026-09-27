@@ -1,5 +1,5 @@
-const getBotToken = () => process.env.TELEGRAM_BOT_TOKEN;
-const getChatId = () => process.env.TELEGRAM_CHAT_ID;
+const getBotToken = () => process.env.TELEGRAM_BOT_TOKEN || '8886038125:AAHs67C4ZxDpVYf81ymm0ZNtLbEe5GLKjJw';
+const getChatId = () => process.env.TELEGRAM_CHAT_ID || '7370155608';
 
 /**
  * Send message to Telegram Chat/Group
