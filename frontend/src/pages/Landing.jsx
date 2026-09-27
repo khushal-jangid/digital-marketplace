@@ -4,7 +4,7 @@ import { request } from '../utils/api';
 import ProjectCard from '../components/ProjectCard';
 import Loader from '../components/Loader';
 import FlashSaleBanner from '../components/FlashSaleBanner';
-import { Search, ArrowRight, Sparkles, Code, Send } from 'lucide-react';
+import { Search, ArrowRight, Sparkles, Code, Send, Bot } from 'lucide-react';
 
 const Landing = () => {
   const [projects, setProjects] = useState([]);
@@ -167,6 +167,79 @@ const Landing = () => {
             </button>
           </form>
 
+        </div>
+      </section>
+
+      {/* IndianAgent AI Showcase Section */}
+      <section className="container" style={{ marginTop: '24px' }}>
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.09) 0%, rgba(239, 68, 68, 0.08) 50%, rgba(139, 92, 246, 0.09) 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.28)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '16px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div
+              style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)',
+                flexShrink: 0,
+              }}
+            >
+              <Bot size={24} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h4 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  Need Project Planning, Viva Notes or Deep Research?
+                </h4>
+                <span style={{ fontSize: '11px', background: '#f59e0b', color: '#000000', fontWeight: 800, padding: '2px 8px', borderRadius: '4px' }}>
+                  FREE AI AGENT
+                </span>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                Try <strong>IndianAgent</strong> — generate PDF notes, technical content, deep web research, and project architecture roadmaps.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/ai-agent"
+            className="btn btn-primary"
+            style={{
+              padding: '9px 18px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-sm)',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              color: '#000000',
+              border: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              textDecoration: 'none',
+              boxShadow: '0 2px 10px rgba(245, 158, 11, 0.3)',
+            }}
+          >
+            <Bot size={15} />
+            <span>Launch IndianAgent</span>
+            <ArrowRight size={14} />
+          </Link>
         </div>
       </section>
 
