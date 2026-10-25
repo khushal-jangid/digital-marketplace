@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -100,6 +100,30 @@ const ProjectCard = ({ project }) => {
             className="card-thumb-img"
           />
         </Link>
+
+        {/* Diwali Festive Deal Ribbon */}
+        <span
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px',
+            background: 'linear-gradient(135deg, #b91c1c 0%, #f59e0b 100%)',
+            color: '#ffffff',
+            fontSize: '10px',
+            fontWeight: 800,
+            padding: '3px 8px',
+            borderRadius: '4px',
+            boxShadow: '0 2px 8px rgba(185, 28, 28, 0.4)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            letterSpacing: '0.02em',
+            zIndex: 2,
+          }}
+        >
+          <span>🪔</span>
+          <span>DIWALI DEAL</span>
+        </span>
 
         {/* Category Pill */}
         <span
@@ -371,3 +395,5 @@ const ProjectCard = ({ project }) => {
 };
 
 export default ProjectCard;
+
+

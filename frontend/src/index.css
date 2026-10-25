@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+﻿﻿@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 
 :root {
   /* Typography — a receipt/manifest identity: geometric display,
@@ -677,4 +677,19 @@ h1, h2, h3, h4, h5, h6 {
 .festive-logo-glow:hover {
   filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.7));
   transform: scale(1.03);
+}
+
+
+@keyframes diwali-sway {
+  0%, 100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+
+.project-card-wrapper:hover {
+  box-shadow: 0 12px 28px -4px rgba(245, 158, 11, 0.35) !important;
+  border-color: rgba(245, 158, 11, 0.5) !important;
 }

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿﻿import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -131,18 +131,24 @@ const Navbar = () => {
           <Link
             to="/projects"
             style={{
-              color: isActive('/projects') ? 'var(--text-primary)' : 'var(--text-secondary)',
-              background: isActive('/projects') ? 'var(--bg-tertiary)' : 'transparent',
+              color: isActive('/projects') ? '#fbbf24' : 'var(--text-secondary)',
+              background: isActive('/projects') ? 'rgba(245, 158, 11, 0.15)' : 'transparent',
               textDecoration: 'none',
               fontSize: '13.5px',
-              fontWeight: 500,
+              fontWeight: 700,
               padding: '6px 12px',
               borderRadius: 'var(--radius-sm)',
-              border: isActive('/projects') ? '1px solid var(--border)' : '1px solid transparent',
+              border: isActive('/projects') ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid transparent',
               transition: 'all 0.2s ease',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
-            Explore Projects
+            <span>Explore Projects</span>
+            <span style={{ background: 'linear-gradient(135deg, #ef4444, #f59e0b)', color: '#ffffff', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.02em' }}>
+              🪔 50% OFF
+            </span>
           </Link>
 
           <Link
@@ -941,5 +947,7 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
+
 
 
