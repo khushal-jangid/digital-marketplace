@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, X } from 'lucide-react';
 
 export default function DiwaliFestiveOverlay() {
