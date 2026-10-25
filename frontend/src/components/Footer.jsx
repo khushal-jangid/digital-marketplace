@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Link } from "react-router-dom";
 import { Terminal, MessageSquare, Mail, Send, Bot } from "lucide-react";
 
@@ -27,23 +27,22 @@ const Footer = () => {
       >
         {/* Brand Column */}
         <div style={{ maxWidth: "340px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            <div
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+            <img
+              src="/logo.png"
+              alt="ApexMarket"
+              className="festive-logo-glow"
               style={{
-                background: "var(--primary)",
-                width: "22px",
-                height: "22px",
-                borderRadius: "5px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#ffffff",
+                height: "30px",
+                width: "auto",
+                borderRadius: "6px",
+                objectFit: "contain",
+                boxShadow: "0 0 10px rgba(99, 102, 241, 0.4)",
+                border: "1px solid rgba(129, 140, 248, 0.3)",
               }}
-            >
-              <Terminal size={13} strokeWidth={2.5} />
-            </div>
-            <span style={{ fontFamily: "var(--font-heading)", fontWeight: 700, color: "var(--text-primary)", fontSize: "15px" }}>
-              ApexMarket
+            />
+            <span style={{ fontFamily: "var(--font-heading)", fontWeight: 700, color: "var(--text-primary)", fontSize: "16px" }}>
+              ApexMarket 🪔
             </span>
           </div>
           <p style={{ color: "var(--text-muted)", lineHeight: "1.5", fontSize: "12.5px" }}>
@@ -208,3 +207,4 @@ const Footer = () => {
 };
 
 export default Footer;
+

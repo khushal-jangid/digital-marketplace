@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+﻿import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Providers Contexts
@@ -13,6 +13,7 @@ import Footer from './components/Footer';
 import MobileBottomNav from './components/MobileBottomNav';
 import ScrollToTop from './components/ScrollToTop';
 import CouponBanner from './components/CouponBanner';
+import DiwaliFestiveOverlay from './components/DiwaliFestiveOverlay';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 
@@ -90,6 +91,7 @@ function App() {
                 color: 'var(--text-primary)'
               }}>
                 
+                <DiwaliFestiveOverlay />
                 <CouponBanner />
                 <Navbar />
 
@@ -161,3 +163,5 @@ function App() {
 }
 
 export default App;
+
+

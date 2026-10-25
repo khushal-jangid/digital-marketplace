@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
 
 :root {
   /* Typography — a receipt/manifest identity: geometric display,
@@ -625,3 +625,56 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 
+
+
+/* ========================================================
+   Diwali Festive Animations & Effects
+   ======================================================== */
+@keyframes diwali-twinkle {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes diwali-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes diya-flame-flicker {
+  0%, 100% {
+    transform: scaleY(1) scaleX(1) rotate(0deg);
+    opacity: 0.95;
+  }
+  25% {
+    transform: scaleY(1.15) scaleX(0.92) rotate(-2deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleY(0.9) scaleX(1.08) rotate(2deg);
+    opacity: 0.88;
+  }
+  75% {
+    transform: scaleY(1.2) scaleX(0.9) rotate(-1deg);
+    opacity: 1;
+  }
+}
+
+.festive-logo-glow {
+  filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.45));
+  transition: filter 0.3s ease, transform 0.2s ease;
+}
+
+.festive-logo-glow:hover {
+  filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.7));
+  transform: scale(1.03);
+}

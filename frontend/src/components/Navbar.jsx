@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -96,21 +96,19 @@ const Navbar = () => {
             gap: '10px',
           }}
         >
-          <div
+          <img
+            src="/logo.png"
+            alt="ApexMarket"
+            className="festive-logo-glow"
             style={{
-              background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-              width: '32px',
-              height: '32px',
+              height: '38px',
+              width: 'auto',
               borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#ffffff',
-              boxShadow: '0 2px 10px rgba(79, 70, 229, 0.35)',
+              objectFit: 'contain',
+              boxShadow: '0 0 14px rgba(99, 102, 241, 0.45)',
+              border: '1px solid rgba(129, 140, 248, 0.35)',
             }}
-          >
-            <Terminal size={18} strokeWidth={2.5} />
-          </div>
+          />
           <span
             style={{
               fontFamily: 'var(--font-heading)',
@@ -118,9 +116,13 @@ const Navbar = () => {
               fontSize: '18px',
               letterSpacing: '-0.03em',
               color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}
           >
             ApexMarket
+            <span role="img" aria-label="diya" style={{ fontSize: '15px' }}>🪔</span>
           </span>
         </Link>
 
@@ -518,22 +520,21 @@ const Navbar = () => {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div
+              <img
+                src="/logo.png"
+                alt="ApexMarket"
+                className="festive-logo-glow"
                 style={{
-                  background: 'linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%)',
-                  width: '28px',
-                  height: '28px',
+                  height: '30px',
+                  width: 'auto',
                   borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ffffff',
+                  objectFit: 'contain',
+                  boxShadow: '0 0 10px rgba(99, 102, 241, 0.4)',
+                  border: '1px solid rgba(129, 140, 248, 0.3)',
                 }}
-              >
-                <Terminal size={16} strokeWidth={2.5} />
-              </div>
+              />
               <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, color: 'var(--text-primary)', fontSize: '17px' }}>
-                ApexMarket
+                ApexMarket 🪔
               </span>
             </div>
 
@@ -940,3 +941,5 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
+
