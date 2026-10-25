@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Flame, X, Volume2, Gift } from 'lucide-react';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import { Sparkles, X } from 'lucide-react';
 
 export default function DiwaliFestiveOverlay() {
   const [bannerVisible, setBannerVisible] = useState(true);
@@ -155,7 +155,7 @@ export default function DiwaliFestiveOverlay() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <span role="img" aria-label="diya" style={{ fontSize: '18px' }}>🪔</span>
+            <span role="img" aria-label="diya" style={{ fontSize: '18px' }}>ðŸª”</span>
             <strong style={{ color: '#fef08a', letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '13px' }}>
               Shubh Deepawali Dhamaka Sale!
             </strong>
@@ -185,7 +185,7 @@ export default function DiwaliFestiveOverlay() {
               onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               <Sparkles size={13} />
-              Burst Crackers 🎆
+              Burst Crackers ðŸŽ†
             </button>
           </div>
 
@@ -285,9 +285,10 @@ export default function DiwaliFestiveOverlay() {
             border: '1px solid rgba(245, 158, 11, 0.4)',
           }}
         >
-          🪔 शुभ लाभ
+          ðŸª” à¤¶à¥à¤­ à¤²à¤¾à¤­
         </span>
       </div>
     </>
   );
 }
+

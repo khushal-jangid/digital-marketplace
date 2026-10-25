@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { request } from '../utils/api';
 import ProjectCard from '../components/ProjectCard';
@@ -8,16 +8,11 @@ import {
   Search,
   ArrowRight,
   Sparkles,
-  Code,
   Send,
   Bot,
   Clock,
   Copy,
   Check,
-  Flame,
-  Tag,
-  Gift,
-  Zap,
 } from 'lucide-react';
 
 const Landing = () => {
@@ -179,7 +174,7 @@ const Landing = () => {
               }}
             >
               <Sparkles size={14} style={{ color: '#fbbf24' }} />
-              <span>🪔 BIG DIWALI TECH FESTIVAL 2026 • DHAMAKA DEALS 🪔</span>
+              <span>ðŸª” BIG DIWALI TECH FESTIVAL 2026 â€¢ DHAMAKA DEALS ðŸª”</span>
               <Sparkles size={14} style={{ color: '#fbbf24' }} />
             </div>
           </div>
@@ -230,7 +225,7 @@ const Landing = () => {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#fde047', fontSize: '12px', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <Clock size={14} />
-              <span>⏰ DIWALI DHAMAKA OFFERS END IN:</span>
+              <span>â° DIWALI DHAMAKA OFFERS END IN:</span>
             </div>
             <div style={{ display: 'flex', gap: '10px' }}>
               {[
@@ -287,7 +282,7 @@ const Landing = () => {
                 <span style={{ fontSize: '11px', fontWeight: 800, background: '#ef4444', color: '#fff', padding: '2px 8px', borderRadius: '4px' }}>
                   FLAT 50% OFF
                 </span>
-                <span style={{ fontSize: '18px' }}>🪔</span>
+                <span style={{ fontSize: '18px' }}>ðŸª”</span>
               </div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px', marginBottom: '2px' }}>
                 Major Projects Code
@@ -333,13 +328,13 @@ const Landing = () => {
                 <span style={{ fontSize: '11px', fontWeight: 800, background: '#38bdf8', color: '#000', padding: '2px 8px', borderRadius: '4px' }}>
                   STEAL DEAL
                 </span>
-                <span style={{ fontSize: '18px' }}>⚡</span>
+                <span style={{ fontSize: '18px' }}>âš¡</span>
               </div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px', marginBottom: '2px' }}>
                 Mini Projects & Utilities
               </div>
               <div style={{ color: '#38bdf8', fontSize: '11.5px', marginBottom: '8px' }}>
-                Starting at only <strong>₹99 - ₹199</strong>
+                Starting at only <strong>â‚¹99 - â‚¹199</strong>
               </div>
               <button
                 onClick={() => navigate('/projects?category=templates')}
@@ -356,7 +351,7 @@ const Landing = () => {
                   cursor: 'pointer',
                 }}
               >
-                Explore ₹99 Deals →
+                Explore â‚¹99 Deals â†’
               </button>
             </div>
 
@@ -374,7 +369,7 @@ const Landing = () => {
                 <span style={{ fontSize: '11px', fontWeight: 800, background: '#ec4899', color: '#fff', padding: '2px 8px', borderRadius: '4px' }}>
                   DHAMAKA BUNDLE
                 </span>
-                <span style={{ fontSize: '18px' }}>🎁</span>
+                <span style={{ fontSize: '18px' }}>ðŸŽ</span>
               </div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px', marginBottom: '2px' }}>
                 Buy 2 Get 1 FREE
@@ -420,7 +415,7 @@ const Landing = () => {
                 <span style={{ fontSize: '11px', fontWeight: 800, background: '#10b981', color: '#000', padding: '2px 8px', borderRadius: '4px' }}>
                   FESTIVE CUSTOM
                 </span>
-                <span style={{ fontSize: '18px' }}>🚀</span>
+                <span style={{ fontSize: '18px' }}>ðŸš€</span>
               </div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px', marginBottom: '2px' }}>
                 Custom College Projects
@@ -443,7 +438,7 @@ const Landing = () => {
                   cursor: 'pointer',
                 }}
               >
-                Request Custom Work →
+                Request Custom Work â†’
               </button>
             </div>
           </div>
@@ -495,7 +490,7 @@ const Landing = () => {
                 boxShadow: '0 2px 10px rgba(245, 158, 11, 0.4)',
               }}
             >
-              Search Deals 🪔
+              Search Deals ðŸª”
             </button>
           </form>
 
@@ -598,10 +593,10 @@ const Landing = () => {
         >
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {[
-              { id: 'all', label: '🪔 All Diwali Deals' },
-              { id: 'source-code', label: '💻 Full Source Codes' },
-              { id: 'templates', label: '⚡ Starter Templates' },
-              { id: 'pdfs', label: '📄 Architecture & Viva Guides' },
+              { id: 'all', label: 'ðŸª” All Diwali Deals' },
+              { id: 'source-code', label: 'ðŸ’» Full Source Codes' },
+              { id: 'templates', label: 'âš¡ Starter Templates' },
+              { id: 'pdfs', label: 'ðŸ“„ Architecture & Viva Guides' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -690,7 +685,7 @@ const Landing = () => {
                 marginBottom: '12px',
               }}
             >
-              🪔 Festive Custom Development Offer
+              ðŸª” Festive Custom Development Offer
             </span>
             <h3 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '10px', color: 'var(--text-primary)' }}>
               Need a Custom Web, Mobile App or College Major Project?
@@ -728,3 +723,4 @@ const Landing = () => {
 };
 
 export default Landing;
+
