@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { isDiwaliFestiveActive } from '../utils/festiveHelper';
+﻿import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -122,7 +123,7 @@ const Navbar = () => {
             }}
           >
             ApexMarket
-            <span role="img" aria-label="diya" style={{ fontSize: '15px' }}>🪔</span>
+            {isDiwaliFestiveActive() && <span role="img" aria-label="diya" style={{ fontSize: "15px" }}>🪔</span>}
           </span>
         </Link>
 
@@ -146,9 +147,7 @@ const Navbar = () => {
             }}
           >
             <span>Explore Projects</span>
-            <span style={{ background: 'linear-gradient(135deg, #ef4444, #f59e0b)', color: '#ffffff', fontSize: '10px', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.02em' }}>
-              🪔 50% OFF
-            </span>
+            {isDiwaliFestiveActive() && <span style={{ background: "linear-gradient(135deg, #ef4444, #f59e0b)", color: "#ffffff", fontSize: "10px", fontWeight: 800, padding: "2px 6px", borderRadius: "4px", letterSpacing: "0.02em" }}>🪔 50% OFF</span>}
           </Link>
 
           <Link
@@ -540,7 +539,7 @@ const Navbar = () => {
                 }}
               />
               <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, color: 'var(--text-primary)', fontSize: '17px' }}>
-                ApexMarket 🪔
+                ApexMarket {isDiwaliFestiveActive() ? "🪔" : ""}
               </span>
             </div>
 
@@ -947,6 +946,7 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
 
 
 

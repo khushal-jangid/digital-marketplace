@@ -1,9 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, X } from 'lucide-react';
+import { isDiwaliFestiveActive } from '../utils/festiveHelper';
 
 export default function DiwaliFestiveOverlay() {
+  const [active, setActive] = useState(isDiwaliFestiveActive());
   const [bannerVisible, setBannerVisible] = useState(true);
   const canvasRef = useRef(null);
+
+  // Auto-check expiry timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActive(isDiwaliFestiveActive());
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Trigger firecracker particle burst on canvas
   const burstFireworks = () => {
@@ -19,7 +29,6 @@ export default function DiwaliFestiveOverlay() {
       '#ec4899', '#8b5cf6', '#fbbf24', '#ffffff', '#ffd700'
     ];
 
-    // Create 3 origin points for a richer festive burst
     const origins = [
       { x: window.innerWidth * 0.25, y: window.innerHeight * 0.35 },
       { x: window.innerWidth * 0.5, y: window.innerHeight * 0.28 },
@@ -50,7 +59,7 @@ export default function DiwaliFestiveOverlay() {
       particles.forEach((p) => {
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.09; // gravity
+        p.vy += 0.09;
         p.alpha -= p.decay;
         if (p.alpha > 0) {
           alive = true;
@@ -72,13 +81,18 @@ export default function DiwaliFestiveOverlay() {
     animate();
   };
 
-  // Welcome burst on mount
   useEffect(() => {
+    if (!active) return;
     const timer = setTimeout(() => {
       burstFireworks();
     }, 1500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [active]);
+
+  // If timer expired, render nothing
+  if (!active) {
+    return null;
+  }
 
   return (
     <>
@@ -155,7 +169,7 @@ export default function DiwaliFestiveOverlay() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <span role="img" aria-label="diya" style={{ fontSize: '18px' }}>ðŸª”</span>
+            <span role="img" aria-label="diya" style={{ fontSize: '18px' }}>🪔</span>
             <strong style={{ color: '#fef08a', letterSpacing: '0.04em', textTransform: 'uppercase', fontSize: '13px' }}>
               Shubh Deepawali Dhamaka Sale!
             </strong>
@@ -185,7 +199,7 @@ export default function DiwaliFestiveOverlay() {
               onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
             >
               <Sparkles size={13} />
-              Burst Crackers ðŸŽ†
+              Burst Crackers 🎆
             </button>
           </div>
 
@@ -209,7 +223,7 @@ export default function DiwaliFestiveOverlay() {
         </aside>
       )}
 
-      {/* Floating Interactive Diya in bottom corner (Subh Labh) */}
+      {/* Floating Interactive Diya in bottom corner */}
       <div
         onClick={burstFireworks}
         title="Shubh Deepawali! Click for Festive Fireworks & Good Luck"
@@ -228,7 +242,6 @@ export default function DiwaliFestiveOverlay() {
         onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.2) translateY(-6px)')}
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1) translateY(0)')}
       >
-        {/* Animated Flickering Diya Flame */}
         <div
           style={{
             width: '16px',
@@ -242,7 +255,6 @@ export default function DiwaliFestiveOverlay() {
           }}
         />
 
-        {/* Traditional Clay Diya Base */}
         <div
           style={{
             width: '42px',
@@ -254,7 +266,6 @@ export default function DiwaliFestiveOverlay() {
             position: 'relative',
           }}
         >
-          {/* Diya Rim Ornament */}
           <div
             style={{
               position: 'absolute',
@@ -285,10 +296,9 @@ export default function DiwaliFestiveOverlay() {
             border: '1px solid rgba(245, 158, 11, 0.4)',
           }}
         >
-          ðŸª” à¤¶à¥à¤­ à¤²à¤¾à¤­
+          🪔 शुभ लाभ
         </span>
       </div>
     </>
   );
 }
-
